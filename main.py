@@ -110,7 +110,7 @@ def extend_daioe_years(
         [
             base.select(pl.max("year")),
             scb_lazy_lf_changes.select(pl.max("year")),
-        ]
+        ],
     )
     daioe_max_year = daioe_max_res.item()
     scb_max_year = scb_max_res.item()
