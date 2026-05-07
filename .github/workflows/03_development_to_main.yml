@@ -51,6 +51,8 @@ jobs:
           cd source
           required_files=(
             "app.py"
+            "_brand.yml"
+            "logos/lab.svg"
             "data/scb_months_lvl1.parquet"
             "Dockerfile"
             ".dockerignore"
@@ -72,6 +74,8 @@ jobs:
           cd source
           files=(
             "app.py"
+            "_brand.yml"
+            "logos/lab.svg"
             "data/scb_months_lvl1.parquet"
             "Dockerfile"
             ".dockerignore"
@@ -106,6 +110,8 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -- \
             app.py \
+            _brand.yml \
+            logos/lab.svg \
             data/scb_months_lvl1.parquet \
             Dockerfile \
             .dockerignore \
