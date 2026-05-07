@@ -1,51 +1,50 @@
-# Byte-compiled / optimized / DLL files
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
-
-# Distribution / packaging
+*.so
+.Python
+env/
 build/
+develop-eggs/
 dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
 *.egg-info/
+.installed.cfg
 *.egg
+MANIFEST
 
-# Unit test / coverage reports
-.coverage
-.cache
-.pytest_cache/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# pyenv
+# UV & Virtual Environments
+.venv/
+uv.lock
 .python-version
 
-# Environments
-.env
-.venv
-env/
-venv/
-
-# mypy
-.mypy_cache/
-
-# VS Code
+# IDEs
 .vscode/
+.idea/
+.positron/
+*.swp
+*.swo
 
-# Ruff
-.ruff_cache/
+# Project Specific - Data
+# We ignore the generated output and cached parquet files 
+# but keep the structure if needed.
+data/*.parquet
+!data/.gitkeep
 
-# uv
-.uv/
+# Project Specific - Shiny
+.shiny/
+auth.json
 
-# Data
-data/
-
-# OS-specific files
+# OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
