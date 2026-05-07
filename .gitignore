@@ -27,6 +27,7 @@ MANIFEST
 .venv/
 uv.lock
 .python-version
+.ruff_cache/
 
 # IDEs
 .vscode/
