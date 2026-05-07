@@ -1,0 +1,73 @@
+# Python cache and bytecode
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments / local packages
+env/
+venv/
+.venv/
+__pypackages__/
+
+# Installer / build logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Test / coverage artifacts
+.tox
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.mypy_cache
+.pytest_cache
+.hypothesis
+
+# Packaging / build artifacts
+dist/
+build/
+*.egg-info/
+.eggs/
+*.whl
+
+# Environment files (local secrets)
+.env
+.env.*
+!.env.example
+
+# Git data
+.git
+
+# Local tooling / OS cruft
+.python-version
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Notebook checkpoints
+.ipynb_checkpoints/
+
+# Frontend dependency caches (if present)
+node_modules/
+
+# Project-specific cruft
+_brand.yml
+
+# Local cache / output files
+data/*
+!data/.gitkeep
+!data/daioe_*_v*.csv
+!data/scb_months_lvl1.parquet
+
+# remove extra files 
+.gitattributes
+.github
+.gitignore
+.ruff_cache
+.dockerignore
