@@ -35,7 +35,7 @@ occupations = (
 )
 
 # --- Page Options ---
-ui.page_opts(title="AI Exposure & Employment Dashboard", fillable=True)
+ui.page_opts(title="AI Exposure & Employment Dashboard Test", fillable=True)
 
 # --- Sidebar ---
 with ui.sidebar():
