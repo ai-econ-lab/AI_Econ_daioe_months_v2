@@ -3,13 +3,14 @@ from pathlib import Path
 import plotly.express as px
 import polars as pl
 from shiny import reactive, render
+from shiny.express import app_opts, ui
 from shiny.express import input as app_input
-from shiny.express import ui
 from shinywidgets import render_widget
 
 # --- Constants ---
 MIN_POINTS_FOR_TRENDLINE = 2
 DATA_PATH = Path(__file__).parent / "data" / "scb_months_lvl1.parquet"
+LOGOS_PATH = Path(__file__).parent / "logos"
 
 
 # --- Data Loading ---
@@ -35,10 +36,34 @@ occupations = (
 )
 
 # --- Page Options ---
-ui.page_opts(title="AI Exposure & Employment Dashboard", fillable=True)
+app_opts(static_assets={"/logos": LOGOS_PATH})
+
+ui.page_opts(
+    title="AI Exposure & Employment Dashboard",
+    fillable=True,
+    theme=ui.Theme.from_brand(__file__),
+)
+
+ui.tags.style("""
+.app-logo-wrap {
+    display: flex;
+    justify-content: center;
+    margin: 0.25rem 0 1rem;
+}
+
+.app-logo {
+    width: min(180px, 80%);
+    height: auto;
+    border-radius: 6px;
+}
+""")
 
 # --- Sidebar ---
 with ui.sidebar():
+    ui.div(
+        ui.img(src="/logos/lab.svg", alt="AI-Econ Lab logo", class_="app-logo"),
+        class_="app-logo-wrap",
+    )
     ui.input_select(
         "ai_metric",
         "Select AI Exposure Metric (Weighted Avg)",
