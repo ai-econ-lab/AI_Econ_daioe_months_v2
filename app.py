@@ -280,18 +280,18 @@ with ui.card(full_screen=True):
             title_font_family="Montserrat",
             plot_bgcolor="#FFFFFF",
             paper_bgcolor="#FFFFFF",
-            legend=dict(
-                bgcolor="rgba(249,247,241,0.9)",
-                bordercolor="#E0DDD6",
-                borderwidth=1,
-            ),
-            margin=dict(l=60, r=30, t=40, b=60),
+            legend={
+                "bgcolor": "rgba(249,247,241,0.9)",
+                "bordercolor": "#E0DDD6",
+                "borderwidth": 1,
+            },
+            margin={"l": 60, "r": 30, "t": 40, "b": 60},
         )
 
         if use_trendline:
             fig.update_traces(
-                selector=dict(mode="lines"),
-                line=dict(color="#0C0A3E", width=2, dash="dot"),
+                selector={"mode": "lines"},
+                line={"color": "#0C0A3E", "width": 2, "dash": "dot"},
             )
 
         return fig
