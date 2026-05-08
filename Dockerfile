@@ -34,9 +34,7 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 # Copy only what the app needs at runtime
 COPY app.py ./app.py
-COPY _brand.yml ./_brand.yml
 COPY data ./data
-COPY logos ./logos
 
 # Requirement for deployment at hf
 EXPOSE 7860
