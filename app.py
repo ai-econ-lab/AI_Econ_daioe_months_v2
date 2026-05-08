@@ -3,25 +3,26 @@ from pathlib import Path
 import plotly.express as px
 import polars as pl
 from shiny import reactive, render
+from shiny.express import app_opts, ui
 from shiny.express import input as app_input
-from shiny.express import ui
 from shinywidgets import render_widget
 
 # --- Constants ---
 MIN_POINTS_FOR_TRENDLINE = 2
 DATA_PATH = Path(__file__).parent / "data" / "scb_months_lvl1.parquet"
+LOGOS_PATH = Path(__file__).parent / "logos"
 
 # Brand-aligned color sequence for occupation dots
 BRAND_COLORS = [
     "#4D6CFA",  # violet (primary accent)
     "#BA274A",  # red
-    "#0C0A3E",  # deep blue
     "#5BC0BE",  # teal
     "#F9A03F",  # amber
     "#8B5CF6",  # purple
-    "#2A2E45",  # gray-blue
+    "#0C0A3E",  # deep blue
     "#E8A838",  # gold
     "#6B9BC3",  # steel blue
+    "#2A2E45",  # gray-blue
 ]
 
 # Human-readable labels for DAIOE weighted-average metrics
@@ -45,15 +46,13 @@ HORIZON_LABELS = {
     "pct_chg_6m": "6 Months",
 }
 
-# Columns to show in the data table (exclude the 60+ DAIOE variants)
-TABLE_COLS = [
+# Columns shown in the data table — prioritise the selected metric & horizon,
+# then a curated set of DAIOE weighted averages (avoids dumping all 68 cols).
+TABLE_BASE_COLS = [
     "year", "month", "sex", "occupation", "emp_count",
     "pct_chg_1m", "pct_chg_3m", "pct_chg_6m",
-    "daioe_allapps_wavg", "daioe_genai_wavg", "daioe_lngmod_wavg",
-    "daioe_speechrec_wavg", "daioe_imgrec_wavg", "daioe_imggen_wavg",
-    "daioe_translat_wavg", "daioe_readcompr_wavg",
-    "daioe_stratgames_wavg", "daioe_videogames_wavg", "daioe_imgcompr_wavg",
 ]
+TABLE_DAIOE_COLS = list(METRIC_LABELS.keys())
 
 
 # --- Data Loading ---
@@ -68,7 +67,6 @@ df_full = load_data()
 daioe_metrics = [
     col for col in df_full.columns if col.startswith("daioe_") and col.endswith("_wavg")
 ]
-change_metrics = list(HORIZON_LABELS.keys())
 sexes = df_full["sex"].unique().to_list() if not df_full.is_empty() else []
 years = sorted(df_full["year"].unique().to_list()) if not df_full.is_empty() else []
 occupations = (
@@ -77,24 +75,50 @@ occupations = (
     else []
 )
 
-# Build metric choice dict — fall back to auto-label for any unmapped columns
+# Build metric choice dict — fall back gracefully for any unmapped columns
 metric_choices = {
-    m: METRIC_LABELS.get(m, m.replace("daioe_", "").replace("_wavg", "").replace("_", " ").title())
+    m: METRIC_LABELS.get(
+        m,
+        m.replace("daioe_", "").replace("_wavg", "").replace("_", " ").title(),
+    )
     for m in daioe_metrics
 }
 
-# Default to "All AI Applications" if present, else last metric
 default_metric = (
     "daioe_allapps_wavg" if "daioe_allapps_wavg" in daioe_metrics
     else (daioe_metrics[-1] if daioe_metrics else None)
 )
 
 
-# --- Page Options ---
-ui.page_opts(title="AI Exposure & Employment", fillable=True)
+# --- Page Setup ---
+app_opts(static_assets={"/logos": LOGOS_PATH})
+
+ui.page_opts(
+    title="AI Exposure & Employment Dashboard",
+    fillable=True,
+    theme=ui.Theme.from_brand(__file__),
+)
+
+ui.tags.style("""
+.app-logo-wrap {
+    display: flex;
+    justify-content: center;
+    margin: 0.25rem 0 1rem;
+}
+.app-logo {
+    width: min(180px, 80%);
+    height: auto;
+    border-radius: 6px;
+}
+""")
+
 
 # --- Sidebar ---
 with ui.sidebar(title="Filters"):
+    ui.div(
+        ui.img(src="/logos/lab.svg", alt="AI-Econ Lab logo", class_="app-logo"),
+        class_="app-logo-wrap",
+    )
     ui.input_select(
         "ai_metric",
         "AI Exposure Metric",
@@ -212,7 +236,7 @@ with ui.card(full_screen=True):
     def scatter_header():
         metric_label = metric_choices.get(app_input.ai_metric(), app_input.ai_metric())
         horizon_label = HORIZON_LABELS.get(app_input.change_horizon(), app_input.change_horizon())
-        return ui.card_header(f"{metric_label} Exposure vs. {horizon_label} Employment Change")
+        return ui.card_header(f"{metric_label} vs. {horizon_label} Employment Change")
 
     @render_widget
     def scatter_plot():
@@ -235,13 +259,13 @@ with ui.card(full_screen=True):
             size="emp_count" if "emp_count" in df.columns else None,
             hover_data=["month", "year", "sex", "emp_count"],
             labels={
-                metric:  f"AI Exposure Score — {metric_label}",
-                horizon: f"% Employment Change ({horizon_label})",
+                metric:       f"AI Exposure Score — {metric_label}",
+                horizon:      f"% Employment Change ({horizon_label})",
                 "occupation": "Occupation",
                 "emp_count":  "Employment",
-                "month": "Month",
-                "year":  "Year",
-                "sex":   "Sex",
+                "month":      "Month",
+                "year":       "Year",
+                "sex":        "Sex",
             },
             color_discrete_sequence=BRAND_COLORS,
             template="plotly_white",
@@ -283,15 +307,13 @@ with ui.card(full_screen=True):
         if df.is_empty():
             return render.DataGrid(df.to_pandas())
 
-        # Show selected metric + selected horizon prominently; keep table manageable
         metric = app_input.ai_metric()
         horizon = app_input.change_horizon()
 
-        priority_cols = ["year", "month", "sex", "occupation", "emp_count", metric, horizon]
-        extra_cols = [c for c in TABLE_COLS if c not in priority_cols and c in df.columns]
-        display_cols = [c for c in priority_cols + extra_cols if c in df.columns]
+        # Selected metric + horizon come first, then remaining base cols, then other DAIOE wavgs
+        priority = ["year", "month", "sex", "occupation", "emp_count", metric, horizon]
+        rest_daioe = [c for c in TABLE_DAIOE_COLS if c not in priority and c in df.columns]
+        rest_base = [c for c in TABLE_BASE_COLS if c not in priority and c in df.columns]
+        display_cols = [c for c in priority + rest_base + rest_daioe if c in df.columns]
 
-        return render.DataGrid(
-            df.select(display_cols).to_pandas(),
-            filters=True,
-        )
+        return render.DataGrid(df.select(display_cols).to_pandas(), filters=True)
