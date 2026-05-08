@@ -8,9 +8,9 @@ meta:
 
 logo:
   images:
-    icon-color: logos/jon.png
-    wide-color:  logos/jon.png
-    tall-color:  logos/jon.png
+    icon-color: logos/lab.svg
+    wide-color:  logos/lab.svg
+    tall-color:  logos/lab.svg
   small:  icon-color
   medium: wide-color
   large:  tall-color
