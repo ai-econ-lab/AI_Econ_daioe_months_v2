@@ -10,9 +10,9 @@ license: mit
 
 # Monthly Employed Persons by Occupation and DAIOEs
 
-<p align="left">
-  <img src="logos/lab.svg" alt="AI-Econ Lab logo" width="200" height="">
-</p>
+![AI-Econ Lab logo](logos/lab.svg)
+
+## Overview
 
 This repository builds and deploys a Shiny dashboard for exploring monthly Swedish
 employment by occupation alongside DAIOE measures of AI exposure. The deployed app is
