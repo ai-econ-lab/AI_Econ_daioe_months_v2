@@ -12,17 +12,24 @@ license: mit
 
 ![AI-Econ Lab logo](logos/lab.svg)
 
+**[Live app on Hugging Face Spaces](https://huggingface.co/spaces/joseph-data/app_months)**
+
 ## Overview
 
-This repository builds and deploys **AI Exposure & Employment Dashboard** — a Shiny app
-for exploring monthly Swedish employment by occupation alongside DAIOE measures of AI
-exposure. The app is packaged with Docker and syncs to Hugging Face Spaces from the
-`main` branch.
+This repository builds and deploys the **AI Exposure & Employment Dashboard** — an
+interactive Shiny app for exploring monthly Swedish employment by occupation alongside
+**DAIOE** (Dynamic AI Occupational Exposure Index) scores.
 
-The dashboard reads `data/scb_months_lvl1.parquet`, filters observations by year, sex,
-occupation, AI exposure metric, and employment-change horizon, then shows summary value
-boxes (average AI exposure, median employment change, observation count), a Plotly
-scatter plot with an OLS trendline, and a filterable data table.
+**DAIOE** measures the potential applicability of AI to occupational content over time.
+It tracks annual progress across nine AI subdomains (games, vision, language, speech)
+and links capability advances to occupational requirements via O*NET abilities, weighted
+by ability importance and social-skill intensity. It is a measure of AI *exposure*, not
+adoption or automation probability. See the [AI-Econ Lab](https://www.ai-econlab.com/ai-exposure-daioe) for full methodology.
+
+The dashboard filters observations by year, sex, occupation, DAIOE metric, and
+employment-change horizon, then shows summary value boxes (average AI exposure, median
+employment change, observation count), a Plotly scatter plot with an OLS trendline, and
+a filterable data table.
 
 ## Runtime Files
 
