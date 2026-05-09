@@ -14,14 +14,15 @@ license: mit
 
 ## Overview
 
-This repository builds and deploys a Shiny dashboard for exploring monthly Swedish
-employment by occupation alongside DAIOE measures of AI exposure. The deployed app is
-packaged with Docker and is intended to sync to Hugging Face Spaces from the `main`
-branch.
+This repository builds and deploys **AI Exposure & Employment Dashboard** — a Shiny app
+for exploring monthly Swedish employment by occupation alongside DAIOE measures of AI
+exposure. The app is packaged with Docker and syncs to Hugging Face Spaces from the
+`main` branch.
 
 The dashboard reads `data/scb_months_lvl1.parquet`, filters observations by year, sex,
 occupation, AI exposure metric, and employment-change horizon, then shows summary value
-boxes, a Plotly scatter plot, and the filtered data table.
+boxes (average AI exposure, median employment change, observation count), a Plotly
+scatter plot with an OLS trendline, and a filterable data table.
 
 ## Runtime Files
 
@@ -32,6 +33,22 @@ The deployable app is intentionally small:
 - `logos/lab.svg` is shown in the app sidebar and README.
 - `data/scb_months_lvl1.parquet` is the app dataset.
 - `Dockerfile`, `.dockerignore`, `pyproject.toml`, and `uv.lock` define the containerized runtime.
+
+## Dependencies
+
+Key Python packages (see `pyproject.toml` for pinned versions):
+
+| Package | Purpose |
+| --- | --- |
+| `shiny[theme]` | Shiny for Python web framework |
+| `shinywidgets` | Plotly widget integration |
+| `plotly` | Interactive scatter plots |
+| `polars` | Fast dataframe operations |
+| `pandas` | DataFrame conversion for Plotly |
+| `pyarrow` | Parquet file I/O |
+| `statsmodels` | OLS trendline in scatter plot |
+
+Requires **Python ≥ 3.14**.
 
 ## Local Development
 
@@ -101,7 +118,23 @@ with `workflow_dispatch`.
 
 ## Data Shape
 
-The app dataset currently has monthly occupation-level rows with employment counts,
-absolute and percentage changes over 1, 3, and 6 months, and multiple DAIOE exposure
-families. The Shiny app uses weighted average DAIOE columns matching
-`daioe_*_wavg` for its exposure selector.
+The app dataset (`data/scb_months_lvl1.parquet`) has monthly occupation-level rows with:
+
+- `year`, `month`, `sex`, `occupation`, `emp_count` — dimensions and employment count
+- `pct_chg_1m`, `pct_chg_3m`, `pct_chg_6m` — percentage employment change over 1, 3, and 6 months
+
+DAIOE weighted-average exposure columns (`daioe_*_wavg`) used as x-axis metrics:
+
+| Column | Label |
+| --- | --- |
+| `daioe_allapps_wavg` | All AI Applications |
+| `daioe_stratgames_wavg` | Strategic Games |
+| `daioe_videogames_wavg` | Video Games |
+| `daioe_imgrec_wavg` | Image Recognition |
+| `daioe_imgcompr_wavg` | Image Compression |
+| `daioe_imggen_wavg` | Image Generation |
+| `daioe_readcompr_wavg` | Reading Comprehension |
+| `daioe_lngmod_wavg` | Language Models |
+| `daioe_translat_wavg` | Translation |
+| `daioe_speechrec_wavg` | Speech Recognition |
+| `daioe_genai_wavg` | Generative AI |
