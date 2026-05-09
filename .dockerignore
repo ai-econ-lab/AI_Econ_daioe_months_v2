@@ -56,8 +56,6 @@ Thumbs.db
 # Frontend dependency caches (if present)
 node_modules/
 
-# Project-specific cruft
-_brand.yml
 
 # Local cache / output files
 data/*
@@ -70,4 +68,3 @@ data/*
 .github
 .gitignore
 .ruff_cache
-.dockerignore
