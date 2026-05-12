@@ -1,319 +1,305 @@
 from pathlib import Path
 
-import plotly.express as px
 import polars as pl
 from shiny import reactive, render
 from shiny.express import app_opts, ui
 from shiny.express import input as app_input
 from shinywidgets import render_widget
 
-# --- Constants ---
-MIN_POINTS_FOR_TRENDLINE = 2
-DATA_PATH = Path(__file__).parent / "data" / "scb_months_lvl1.parquet"
+from src.calcs import (
+    get_comp_radar,
+    get_comp_summary,
+    get_comparison_employment,
+    get_occ_ai_exposure,
+    get_occ_employment_by_sex,
+    get_occ_summary,
+)
+from src.setup import (
+    INTRO_MD,
+    METRICS,
+    OCC_CHOICES,
+    OCCS,
+    SEXES,
+    YEAR_MAX,
+    YEAR_MIN,
+    YEARS,
+    as_great_table_html,
+    download_extension,
+    download_media_type,
+    export_filtered_data,
+    first_cols,
+    lf,
+)
+from src.visuals import (
+    build_ai_exposure_bar,
+    build_comp_radar_plot,
+    build_comparison_employment_plot,
+    build_sex_chart,
+    build_value_boxes,
+)
+
 LOGOS_PATH = Path(__file__).parent / "logos"
 
-# Brand-aligned color sequence for occupation dots
-BRAND_COLORS = [
-    "#4D6CFA",  # violet (primary accent)
-    "#BA274A",  # red
-    "#5BC0BE",  # teal
-    "#F9A03F",  # amber
-    "#8B5CF6",  # purple
-    "#0C0A3E",  # deep blue
-    "#E8A838",  # gold
-    "#6B9BC3",  # steel blue
-    "#2A2E45",  # gray-blue
-]
-
-# Human-readable labels for DAIOE weighted-average metrics
-METRIC_LABELS = {
-    "daioe_allapps_wavg":    "All AI Applications",
-    "daioe_stratgames_wavg": "Strategic Games",
-    "daioe_videogames_wavg": "Video Games",
-    "daioe_imgrec_wavg":     "Image Recognition",
-    "daioe_imgcompr_wavg":   "Image Compression",
-    "daioe_imggen_wavg":     "Image Generation",
-    "daioe_readcompr_wavg":  "Reading Comprehension",
-    "daioe_lngmod_wavg":     "Language Models",
-    "daioe_translat_wavg":   "Translation",
-    "daioe_speechrec_wavg":  "Speech Recognition",
-    "daioe_genai_wavg":      "Generative AI",
-}
-
-HORIZON_LABELS = {
-    "pct_chg_1m": "1 Month",
-    "pct_chg_3m": "3 Months",
-    "pct_chg_6m": "6 Months",
-}
-
-# Columns shown in the data table — prioritise the selected metric & horizon,
-# then a curated set of DAIOE weighted averages (avoids dumping all 68 cols).
-TABLE_BASE_COLS = [
-    "year", "month", "sex", "occupation", "emp_count",
-    "pct_chg_1m", "pct_chg_3m", "pct_chg_6m",
-]
-TABLE_DAIOE_COLS = list(METRIC_LABELS.keys())
-
-
-# --- Data Loading ---
-def load_data():
-    if not DATA_PATH.exists():
-        return pl.DataFrame()
-    return pl.read_parquet(DATA_PATH)
-
-
-df_full = load_data()
-
-daioe_metrics = [
-    col for col in df_full.columns if col.startswith("daioe_") and col.endswith("_wavg")
-]
-sexes = df_full["sex"].unique().to_list() if not df_full.is_empty() else []
-years = sorted(df_full["year"].unique().to_list()) if not df_full.is_empty() else []
-occupations = (
-    sorted(df_full["occupation"].unique().to_list())
-    if not df_full.is_empty() and "occupation" in df_full.columns
-    else []
-)
-
-# Build metric choice dict — fall back gracefully for any unmapped columns
-metric_choices = {
-    m: METRIC_LABELS.get(
-        m,
-        m.replace("daioe_", "").replace("_wavg", "").replace("_", " ").title(),
-    )
-    for m in daioe_metrics
-}
-
-default_metric = (
-    "daioe_allapps_wavg" if "daioe_allapps_wavg" in daioe_metrics
-    else (daioe_metrics[-1] if daioe_metrics else None)
-)
-
-
-# --- Page Setup ---
 app_opts(static_assets={"/logos": LOGOS_PATH})
 
 ui.page_opts(
-    title="AI Exposure & Employment Dashboard",
+    title="AI Exposure & Monthly Employment Explorer",
     fillable=True,
     theme=ui.Theme.from_brand(__file__),
 )
 
-ui.tags.style("""
-.app-logo-wrap {
-    display: flex;
-    justify-content: center;
-    margin: 0.25rem 0 1rem;
-}
-.app-logo {
-    width: min(180px, 80%);
-    height: auto;
-    border-radius: 6px;
-}
-""")
+_DEFAULT_OCC = OCCS[0] if OCCS else None
 
 
-# --- Sidebar ---
-with ui.sidebar(title="Filters"):
-    ui.div(
-        ui.img(src="/logos/lab.svg", alt="AI-Econ Lab logo", class_="app-logo"),
-        class_="app-logo-wrap",
-    )
-    ui.input_select(
-        "ai_metric",
-        "AI Exposure Metric",
-        choices=metric_choices,
-        selected=default_metric,
-    )
-    ui.input_select(
-        "change_horizon",
-        "Employment Change Horizon",
-        choices=HORIZON_LABELS,
-        selected="pct_chg_3m",
-    )
-    ui.input_slider(
-        "year_filter",
-        "Year Range",
-        min=min(years) if years else 2015,
-        max=max(years) if years else 2026,
-        value=[min(years), max(years)] if years else [2015, 2026],
-        sep="",
-    )
-    ui.input_checkbox_group(
-        "sex_filter",
-        "Sex",
-        choices=sexes,
-        selected=sexes,
-    )
-    ui.input_selectize(
-        "occ_filter",
-        "Occupation (blank = all)",
-        choices=occupations,
-        multiple=True,
-    )
-    ui.hr()
-    ui.markdown("""
-    **About**
+# ── Tab navigation ────────────────────────────────────────────
 
-    This dashboard visualizes the relationship between AI Occupational Exposure
-    (DAIOE) and employment changes across Swedish occupational categories.
+with ui.navset_pill(id="main_tabs"):
 
-    Data: [Statistics Sweden (SCB)](https://www.scb.se) &
-    DAIOE scores via the AI-Econ Lab.
-    """)
+    # ── Tab 1: Occupation View ────────────────────────────────
+
+    with ui.nav_panel("Occupation View"):
+        with ui.layout_sidebar():
+            with ui.sidebar(title="Occupation View", width=280):
+                ui.div(
+                    ui.img(
+                        src="/logos/lab.svg",
+                        alt="AI-Econ Lab logo",
+                        style="width:100%; max-width:180px;",
+                    ),
+                    style="text-align:center; margin-bottom:1rem;",
+                )
+                ui.markdown(INTRO_MD)
+                ui.hr()
+                ui.input_select(
+                    "occ_occupation",
+                    "Occupation",
+                    choices=OCC_CHOICES,
+                    selected=_DEFAULT_OCC,
+                )
+                ui.input_select(
+                    "occ_year",
+                    "Year (snapshot)",
+                    choices={str(y): str(y) for y in YEARS},
+                    selected=str(YEAR_MAX),
+                )
+                ui.hr()
+                ui.p("Employment trend filters:", class_="fw-semibold mb-1 small")
+                ui.input_slider(
+                    "occ_year_range",
+                    "Year Range",
+                    min=YEAR_MIN,
+                    max=YEAR_MAX,
+                    value=[YEAR_MIN, YEAR_MAX],
+                    sep="",
+                )
+                ui.input_checkbox_group(
+                    "occ_sexes",
+                    "Sex",
+                    choices=SEXES,
+                    selected=SEXES,
+                )
+
+            # Value boxes
+            @render.ui
+            def occ_value_boxes():
+                summary = occ_summary()
+                if summary is None:
+                    return ui.p(
+                        "No data for the selected occupation and year.",
+                        class_="text-muted p-3",
+                    )
+                return build_value_boxes(summary, app_input.occ_occupation())
+
+            # AI Exposure bar chart
+            with ui.card(full_screen=True):
+                @render_widget
+                def occ_ai_bar():
+                    df = occ_ai_exposure().to_pandas()
+                    return build_ai_exposure_bar(
+                        df,
+                        app_input.occ_occupation(),
+                        int(app_input.occ_year()),
+                    )
+
+            # Monthly employment trend by sex
+            with ui.card(full_screen=True):
+                @render_widget
+                def occ_sex_chart():
+                    df = occ_emp_by_sex().to_pandas()
+                    return build_sex_chart(df, app_input.occ_occupation())
+
+    # ── Tab 2: Comparison View ────────────────────────────────
+
+    with ui.nav_panel("Comparison View"):
+        with ui.layout_sidebar():
+            with ui.sidebar(title="Comparison View", width=280):
+                ui.input_selectize(
+                    "comp_occupations",
+                    "Occupations (up to 5)",
+                    choices=OCC_CHOICES,
+                    multiple=True,
+                    options={"maxItems": 5},
+                )
+                ui.input_checkbox_group(
+                    "comp_sexes",
+                    "Sex",
+                    choices=SEXES,
+                    selected=SEXES,
+                )
+                ui.input_select(
+                    "comp_year",
+                    "Year (AI snapshot)",
+                    choices={str(y): str(y) for y in YEARS},
+                    selected=str(YEAR_MAX),
+                )
+
+            # Employment summary table
+            with ui.card():
+                ui.card_header("Employment Summary")
+
+                @render.ui
+                def comp_summary_table():
+                    occs = list(app_input.comp_occupations() or [])
+                    sexes = list(app_input.comp_sexes() or [])
+                    if not occs or not sexes:
+                        return ui.p(
+                            "Select at least one occupation.",
+                            class_="text-muted p-3",
+                        )
+                    df = get_comp_summary(
+                        lf, occs, sexes, int(app_input.comp_year()),
+                    ).to_pandas()
+                    return as_great_table_html(df, METRICS)
+
+            # Employment change line chart
+            with ui.card(full_screen=True):
+                @render_widget
+                def comp_employment_chart():
+                    df = comparison_data().to_pandas()
+                    return build_comparison_employment_plot(df)
+
+            # AI percentile radar chart
+            with ui.card(full_screen=True):
+                @render_widget
+                def comp_radar_chart():
+                    df = comp_radar_data().to_pandas()
+                    return build_comp_radar_plot(df, METRICS)
+
+    # ── Tab 3: Download ───────────────────────────────────────
+
+    with ui.nav_panel("Download"):
+        with ui.layout_sidebar():
+            with ui.sidebar(title="Download Filters", width=280):
+                ui.input_slider(
+                    "dl_year_range",
+                    "Year Range",
+                    min=YEAR_MIN,
+                    max=YEAR_MAX,
+                    value=[YEAR_MIN, YEAR_MAX],
+                    sep="",
+                )
+                ui.input_checkbox_group(
+                    "dl_sexes",
+                    "Sex",
+                    choices=SEXES,
+                    selected=SEXES,
+                )
+                ui.input_selectize(
+                    "dl_occupations",
+                    "Occupation (blank = all)",
+                    choices=OCC_CHOICES,
+                    multiple=True,
+                )
+                ui.input_select(
+                    "dl_format",
+                    "Format",
+                    choices={"csv": "CSV", "parquet": "Parquet", "excel": "Excel"},
+                    selected="csv",
+                )
+
+                @render.download(
+                    filename=lambda: f"daioe_months.{download_extension(app_input.dl_format())}",
+                    media_type=lambda: download_media_type(app_input.dl_format()),
+                )
+                async def download_data():
+                    df = download_frame().to_pandas()
+                    yield export_filtered_data(df, app_input.dl_format())
+
+            # Row count
+            @render.ui
+            def dl_row_count():
+                n = len(download_frame())
+                return ui.p(f"{n:,} rows match the current filters.", class_="text-muted")
+
+            # Data preview
+            with ui.card(full_screen=True):
+                ui.card_header("Data Preview (first 50 rows)")
+
+                @render.ui
+                def dl_preview():
+                    df = download_frame().head(50)
+                    all_cols = df.columns
+                    ordered = [c for c in first_cols if c in all_cols]
+                    rest = [c for c in all_cols if c not in ordered]
+                    return as_great_table_html(
+                        df.select(ordered + rest).to_pandas(), METRICS,
+                    )
 
 
-# --- Reactive Logic ---
+# ── Reactive calculations ─────────────────────────────────────
+
 @reactive.calc
-def filtered_df():
-    if df_full.is_empty():
-        return pl.DataFrame()
+def occ_summary():
+    return get_occ_summary(lf, app_input.occ_occupation(), int(app_input.occ_year()))
 
-    df = df_full.filter(
-        (pl.col("year") >= app_input.year_filter()[0])
-        & (pl.col("year") <= app_input.year_filter()[1])
-        & (pl.col("sex").is_in(app_input.sex_filter())),
+
+@reactive.calc
+def occ_ai_exposure():
+    return get_occ_ai_exposure(lf, app_input.occ_occupation(), int(app_input.occ_year()))
+
+
+@reactive.calc
+def occ_emp_by_sex():
+    yr = app_input.occ_year_range()
+    return get_occ_employment_by_sex(
+        lf,
+        app_input.occ_occupation(),
+        (yr[0], yr[1]),
+        list(app_input.occ_sexes() or []),
     )
 
-    if app_input.occ_filter():
-        df = df.filter(pl.col("occupation").is_in(app_input.occ_filter()))
 
-    return df
-
-
-# --- KPI Cards ---
-with ui.layout_columns(fill=False):
-    with ui.value_box(theme="primary"):
-        "Avg AI Exposure"
-
-        @render.text
-        def avg_exposure():
-            df = filtered_df()
-            if df.is_empty():
-                return "—"
-            val = df[app_input.ai_metric()].mean()
-            return f"{val:.3f}"
-
-        ui.p(
-            "Weighted average DAIOE score",
-            style="font-size:0.8rem; opacity:0.85; margin:0;",
-        )
-
-    with ui.value_box(theme="secondary"):
-        "Median Employment Change"
-
-        @render.text
-        def median_change():
-            df = filtered_df()
-            if df.is_empty():
-                return "—"
-            val = df[app_input.change_horizon()].median()
-            return f"{val:+.2f}%"
-
-        @render.ui
-        def median_change_label():
-            return ui.p(
-                f"Over {HORIZON_LABELS.get(app_input.change_horizon(), '')}",
-                style="font-size:0.8rem; opacity:0.85; margin:0;",
-            )
-
-    with ui.value_box(theme="info"):
-        "Observations"
-
-        @render.text
-        def obs_count():
-            return f"{len(filtered_df()):,}"
-
-        ui.p(
-            "Data points after filtering",
-            style="font-size:0.8rem; opacity:0.85; margin:0;",
-        )
+@reactive.calc
+def comparison_data():
+    occs = list(app_input.comp_occupations() or [])
+    sexes = list(app_input.comp_sexes() or [])
+    if not occs or not sexes:
+        return pl.DataFrame(schema={
+            "year": pl.Int64,
+            "month": pl.String,
+            "occupation": pl.String,
+            "emp_count": pl.Float64,
+            "pct_chg_1m": pl.Float64,
+        })
+    return get_comparison_employment(lf, occs, sexes)
 
 
-# --- Scatter Plot ---
-with ui.card(full_screen=True):
-    @render.ui
-    def scatter_header():
-        metric_label = metric_choices.get(app_input.ai_metric(), app_input.ai_metric())
-        horizon_label = HORIZON_LABELS.get(app_input.change_horizon(), app_input.change_horizon())
-        return ui.card_header(f"{metric_label} vs. {horizon_label} Employment Change")
-
-    @render_widget
-    def scatter_plot():
-        df = filtered_df().to_pandas()
-        metric = app_input.ai_metric()
-        horizon = app_input.change_horizon()
-        metric_label = metric_choices.get(metric, metric)
-        horizon_label = HORIZON_LABELS.get(horizon, horizon)
-
-        if df.empty:
-            return px.scatter(title="No data available for the selected filters.")
-
-        use_trendline = len(df) > MIN_POINTS_FOR_TRENDLINE
-
-        fig = px.scatter(
-            df,
-            x=metric,
-            y=horizon,
-            color="occupation",
-            size="emp_count" if "emp_count" in df.columns else None,
-            hover_data=["month", "year", "sex", "emp_count"],
-            labels={
-                metric:       f"AI Exposure Score — {metric_label}",
-                horizon:      f"% Employment Change ({horizon_label})",
-                "occupation": "Occupation",
-                "emp_count":  "Employment",
-                "month":      "Month",
-                "year":       "Year",
-                "sex":        "Sex",
-            },
-            color_discrete_sequence=BRAND_COLORS,
-            template="plotly_white",
-            opacity=0.72,
-            trendline="ols" if use_trendline else None,
-            trendline_scope="overall" if use_trendline else None,
-        )
-
-        fig.update_layout(
-            legend_title_text="Occupation",
-            font_family="Nunito Sans",
-            title_font_family="Montserrat",
-            plot_bgcolor="#FFFFFF",
-            paper_bgcolor="#FFFFFF",
-            legend={
-                "bgcolor": "rgba(249,247,241,0.9)",
-                "bordercolor": "#E0DDD6",
-                "borderwidth": 1,
-            },
-            margin={"l": 60, "r": 30, "t": 40, "b": 60},
-        )
-
-        if use_trendline:
-            fig.update_traces(
-                selector={"mode": "lines"},
-                line={"color": "#0C0A3E", "width": 2, "dash": "dot"},
-            )
-
-        return fig
+@reactive.calc
+def comp_radar_data():
+    occs = list(app_input.comp_occupations() or [])
+    if not occs:
+        return pl.DataFrame()
+    return get_comp_radar(lf, occs, int(app_input.comp_year()))
 
 
-# --- Data Table ---
-with ui.card(full_screen=True):
-    ui.card_header("Filtered Data")
-
-    @render.data_frame
-    def data_table():
-        df = filtered_df()
-        if df.is_empty():
-            return render.DataGrid(df.to_pandas())
-
-        metric = app_input.ai_metric()
-        horizon = app_input.change_horizon()
-
-        # Selected metric + horizon come first, then remaining base cols, then other DAIOE wavgs
-        priority = ["year", "month", "sex", "occupation", "emp_count", metric, horizon]
-        rest_daioe = [c for c in TABLE_DAIOE_COLS if c not in priority and c in df.columns]
-        rest_base = [c for c in TABLE_BASE_COLS if c not in priority and c in df.columns]
-        display_cols = [c for c in priority + rest_base + rest_daioe if c in df.columns]
-
-        return render.DataGrid(df.select(display_cols).to_pandas(), filters=True)
+@reactive.calc
+def download_frame():
+    yr = app_input.dl_year_range()
+    q = lf.filter(
+        (pl.col("year") >= yr[0])
+        & (pl.col("year") <= yr[1])
+        & (pl.col("sex").is_in(list(app_input.dl_sexes() or []))),
+    )
+    if app_input.dl_occupations():
+        q = q.filter(pl.col("occupation").is_in(list(app_input.dl_occupations())))
+    return q.collect()
