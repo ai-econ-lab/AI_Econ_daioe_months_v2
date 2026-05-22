@@ -11,10 +11,10 @@ from .constants import (
 
 def get_occ_summary(lf: pl.LazyFrame, occupation: str, year: int) -> dict | None:
     """
-    Aggregate employment and percentage changes for one occupation and year.
+    Return employment and percentage changes for the latest month of the given year.
 
-    Sums emp_count across sexes per month, then averages across months.
-    Returns a dict with keys: employment, pct_1m, pct_3m, pct_6m, year.
+    Sums emp_count across sexes per month, then picks the most recent month.
+    Returns a dict with keys: employment, pct_1m, pct_3m, pct_6m, year, month.
     Returns None if no data matches the filters.
     """
     df = (
@@ -31,22 +31,26 @@ def get_occ_summary(lf: pl.LazyFrame, occupation: str, year: int) -> dict | None
                 pl.col("year").first(),
             ],
         )
+        .sort("month", descending=True)
+        .head(1)
         .collect()
     )
 
     if df.is_empty():
         return None
 
-    def _mean_or_none(col: str) -> float | None:
-        val = df[col].mean()
-        return None if val is None else float(val)
+    row = df.row(0, named=True)
+
+    def _or_none(v: float | None) -> float | None:
+        return None if v is None else float(v)
 
     return {
-        "employment": float(df["emp_count"].mean()),
-        "pct_1m": _mean_or_none("pct_chg_1m"),
-        "pct_3m": _mean_or_none("pct_chg_3m"),
-        "pct_6m": _mean_or_none("pct_chg_6m"),
-        "year": int(df["year"][0]),
+        "employment": row["emp_count"],
+        "pct_1m": _or_none(row["pct_chg_1m"]),
+        "pct_3m": _or_none(row["pct_chg_3m"]),
+        "pct_6m": _or_none(row["pct_chg_6m"]),
+        "year": int(row["year"]),
+        "month": str(row["month"]),
     }
 
 
