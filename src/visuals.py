@@ -16,13 +16,13 @@ DAIOE_SOURCE_MD = "Source: [DAIOEs](https://www.ai-econlab.com/ai-exposure-daioe
 # Brand colours from _brand.yml
 _C_BG = "rgba(0,0,0,0)"
 _C_GRID = "#E5E5E5"
-_C_TEXT = "#1C2826"  # black
-_C_TITLE = "#0C0A3E"  # primary / blue
+_C_TEXT = "#1C2826"
+_C_TITLE = "#0C0A3E"
 
 _FONT_BASE = "Nunito Sans"
 _FONT_HEAD = "Montserrat"
 
-_BASE_LAYOUT = {
+_BASE_LAYOUT: dict = {
     "paper_bgcolor": _C_BG,
     "plot_bgcolor": _C_BG,
     "font": {"family": _FONT_BASE, "color": _C_TEXT, "size": 13},
@@ -40,16 +40,16 @@ def build_value_boxes(summary: dict, occupation: str) -> ui.Tag:
     1/3/6-month change), and a markdown source note.
     """
 
-    def _arrow(v):
+    def _arrow(v: float) -> str:
         return "▼" if v < 0 else "▲"
 
-    def _theme(v):
+    def _theme(v: float) -> str:
         return "danger" if v < 0 else "success"
 
-    def _fmt_pct(v):
+    def _fmt_pct(v: float | None) -> str:
         return f"{_arrow(v)} {v:.0f}%" if v is not None else "N/A"
 
-    def _fmt_theme(v):
+    def _fmt_theme(v: float | None) -> str:
         return _theme(v) if v is not None else "secondary"
 
     emp = summary["employment"]
@@ -70,19 +70,31 @@ def build_value_boxes(summary: dict, occupation: str) -> ui.Tag:
             ui.value_box(
                 title="1-month change",
                 value=_fmt_pct(pct1),
-                showcase=fa.icon_svg("arrow-trend-up" if pct1 is None or pct1 >= 0 else "arrow-trend-down"),
+                showcase=fa.icon_svg(
+                    "arrow-trend-up"
+                    if pct1 is None or pct1 >= 0
+                    else "arrow-trend-down",
+                ),
                 theme=_fmt_theme(pct1),
             ),
             ui.value_box(
                 title="3-month change",
                 value=_fmt_pct(pct3),
-                showcase=fa.icon_svg("arrow-trend-up" if pct3 is None or pct3 >= 0 else "arrow-trend-down"),
+                showcase=fa.icon_svg(
+                    "arrow-trend-up"
+                    if pct3 is None or pct3 >= 0
+                    else "arrow-trend-down",
+                ),
                 theme=_fmt_theme(pct3),
             ),
             ui.value_box(
                 title="6-month change",
                 value=_fmt_pct(pct6),
-                showcase=fa.icon_svg("arrow-trend-up" if pct6 is None or pct6 >= 0 else "arrow-trend-down"),
+                showcase=fa.icon_svg(
+                    "arrow-trend-up"
+                    if pct6 is None or pct6 >= 0
+                    else "arrow-trend-down",
+                ),
                 theme=_fmt_theme(pct6),
             ),
             col_widths=[3, 3, 3, 3],
@@ -91,37 +103,41 @@ def build_value_boxes(summary: dict, occupation: str) -> ui.Tag:
     )
 
 
-def build_sex_chart(df: pd.DataFrame, occupation: str) -> go.Figure:
+def build_employment_count_chart(df: pd.DataFrame, occupation: str) -> go.Figure:
     """
-    Build a Plotly line chart of monthly employment count by sex over time.
+    Build a Plotly line chart of total monthly employment count over time.
 
-    Returns an empty figure if df is empty.
+    1-month % change is shown on hover. Returns an empty figure if df is empty.
     """
     if df.empty:
         return go.Figure()
 
     df = df.fillna(0)
+    df = (
+        df.assign(_date=pd.to_datetime(df["month"], format="%Y-%b"))
+        .sort_values("_date")
+        .drop(columns=["_date"])
+    )
 
-    # Sort months chronologically for the x-axis
-    sorted_months = sorted(df["month"].unique(), key=lambda m: pd.to_datetime(m, format="%Y-%b"))
+    sorted_months = sorted(
+        df["month"].unique(),
+        key=lambda m: pd.to_datetime(m, format="%Y-%b"),
+    )
 
     fig = px.line(
         df,
         x="month",
         y="emp_count",
-        color="sex",
         markers=True,
         custom_data=["pct_chg_1m"],
         labels={
             "month": "Month",
             "emp_count": "Employment",
-            "sex": "Sex",
         },
         category_orders={"month": sorted_months},
     )
     fig.update_traces(
         hovertemplate=(
-            "<b>%{fullData.name}</b><br>"
             "Month: %{x}<br>"
             "Employment: %{y:,.0f}<br>"
             "1-mo Change: %{customdata[0]:.1f}%<extra></extra>"
@@ -134,7 +150,63 @@ def build_sex_chart(df: pd.DataFrame, occupation: str) -> go.Figure:
             "x": 0.01,
             "xanchor": "left",
         },
-        legend={"title": None},
+        showlegend=False,
+    )
+    fig.update_xaxes(gridcolor=_C_GRID, zeroline=False, tickangle=-45)
+    fig.update_yaxes(gridcolor=_C_GRID, zeroline=False)
+    return fig
+
+
+def build_employment_chart(df: pd.DataFrame, occupation: str) -> go.Figure:
+    """
+    Build a Plotly line chart of total 1-month employment % change over time.
+
+    Absolute employment count is shown on hover. Returns an empty figure if df is empty.
+    """
+    if df.empty:
+        return go.Figure()
+
+    df = df.fillna(0)
+    df = (
+        df.assign(_date=pd.to_datetime(df["month"], format="%Y-%b"))
+        .sort_values("_date")
+        .drop(columns=["_date"])
+    )
+
+    sorted_months = sorted(
+        df["month"].unique(),
+        key=lambda m: pd.to_datetime(m, format="%Y-%b"),
+    )
+
+    fig = px.line(
+        df,
+        x="month",
+        y="pct_chg_1m",
+        markers=True,
+        custom_data=["emp_count"],
+        labels={
+            "month": "Month",
+            "pct_chg_1m": "Employment change (%)",
+        },
+        category_orders={"month": sorted_months},
+    )
+    fig.update_traces(
+        hovertemplate=(
+            "Month: %{x}<br>"
+            "Change: %{y:.1f}%<br>"
+            "Employment: %{customdata[0]:,.0f}<extra></extra>"
+        ),
+    )
+    fig.add_hline(y=0, line_color="grey", line_width=1)
+    fig.update_layout(
+        **_BASE_LAYOUT,
+        title={
+            "text": f"Monthly Employment Change of {occupation} in Sweden",
+            "x": 0.01,
+            "xanchor": "left",
+        },
+        yaxis={"ticksuffix": "%"},
+        showlegend=False,
     )
     fig.update_xaxes(gridcolor=_C_GRID, zeroline=False, tickangle=-45)
     fig.update_yaxes(gridcolor=_C_GRID, zeroline=False)
@@ -142,13 +214,21 @@ def build_sex_chart(df: pd.DataFrame, occupation: str) -> go.Figure:
 
 
 def build_comparison_employment_plot(df: pd.DataFrame) -> go.Figure:
-    """Build a line chart comparing monthly employment % change across selected occupations."""
+    """Build a line chart comparing 1-month employment % change across selected occupations."""
     if df.empty:
         return go.Figure()
 
     df = df.fillna(0)
+    df = (
+        df.assign(_date=pd.to_datetime(df["month"], format="%Y-%b"))
+        .sort_values(["occupation", "_date"])
+        .drop(columns=["_date"])
+    )
 
-    sorted_months = sorted(df["month"].unique(), key=lambda m: pd.to_datetime(m, format="%Y-%b"))
+    sorted_months = sorted(
+        df["month"].unique(),
+        key=lambda m: pd.to_datetime(m, format="%Y-%b"),
+    )
 
     fig = px.line(
         df,
@@ -201,13 +281,15 @@ def build_comp_radar_plot(df: pd.DataFrame, metrics: dict[str, str]) -> go.Figur
         r_values_closed = [*r_values, r_values[0]]
         categories_closed = [*categories, categories[0]]
 
-        fig.add_trace(go.Scatterpolar(
-            r=r_values_closed,
-            theta=categories_closed,
-            fill="toself",
-            name=row["occupation"],
-            hovertemplate="%{theta}: %{r:.1f}%<extra></extra>",
-        ))
+        fig.add_trace(
+            go.Scatterpolar(
+                r=r_values_closed,
+                theta=categories_closed,
+                fill="toself",
+                name=row["occupation"],
+                hovertemplate="%{theta}: %{r:.1f}%<extra></extra>",
+            ),
+        )
 
     fig.update_layout(
         **_BASE_LAYOUT,
@@ -224,13 +306,15 @@ def build_comp_radar_plot(df: pd.DataFrame, metrics: dict[str, str]) -> go.Figur
     return fig
 
 
-def build_ai_exposure_bar(df: pd.DataFrame, occupation: str, year: int) -> go.Figure:
+def build_ai_exposure_bar(
+    df: pd.DataFrame,
+    occupation: str,
+    year: int,
+) -> go.Figure:
     """
-    Build a horizontal bar chart of AI exposure per sub-domain.
+    Build a horizontal bar chart of AI exposure level per sub-domain.
 
-    X-axis: percentile rank (0-100).
-    Y-axis: AI sub-domains with emoji labels, sorted by score ascending.
-    Bar colour intensity driven by percentile rank.
+    Bar colour intensity is driven by the percentile rank score.
     Hover shows exposure level label, index score, and percentile rank.
     """
     if df.empty:
@@ -252,7 +336,7 @@ def build_ai_exposure_bar(df: pd.DataFrame, occupation: str, year: int) -> go.Fi
                 "cmax": 100,
             },
             customdata=list(
-                zip(df["level_label"], df["level"], df["score"], strict=False)
+                zip(df["level_label"], df["level"], df["score"], strict=False),
             ),
             hovertemplate=(
                 "<b>%{y}</b><br>"
@@ -275,3 +359,12 @@ def build_ai_exposure_bar(df: pd.DataFrame, occupation: str, year: int) -> go.Fi
     fig.update_xaxes(gridcolor=_C_GRID, zeroline=False)
     fig.update_yaxes(gridcolor=_C_GRID, zeroline=False)
     return fig
+
+
+def export_fig(fig: go.Figure, width: int = 1000, height: int = 650) -> bytes:
+    """Return PNG bytes of a figure with a solid white background."""
+    is_polar = any(getattr(t, "type", "") == "scatterpolar" for t in fig.data)
+    fig.update_layout(paper_bgcolor="white", plot_bgcolor="white")
+    if is_polar:
+        fig.update_layout(polar_bgcolor="white")
+    return fig.to_image(format="png", scale=2, width=width, height=height)

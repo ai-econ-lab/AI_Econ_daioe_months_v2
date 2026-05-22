@@ -60,7 +60,9 @@ jobs:
             "uv.lock"
             ".python-version"
             "src/__init__.py"
-            "src/setup.py"
+            "src/constants.py"
+            "src/data.py"
+            "src/utils.py"
             "src/calcs.py"
             "src/visuals.py"
             "md_files/intro.md"
@@ -88,7 +90,9 @@ jobs:
             "uv.lock"
             ".python-version"
             "src/__init__.py"
-            "src/setup.py"
+            "src/constants.py"
+            "src/data.py"
+            "src/utils.py"
             "src/calcs.py"
             "src/visuals.py"
             "md_files/intro.md"
@@ -129,7 +133,9 @@ jobs:
             uv.lock \
             .python-version \
             src/__init__.py \
-            src/setup.py \
+            src/constants.py \
+            src/data.py \
+            src/utils.py \
             src/calcs.py \
             src/visuals.py \
             md_files/intro.md
