@@ -98,7 +98,7 @@ with ui.navset_pill(id="main_tabs"):
 
         # Stacked cards (full width)
         with ui.layout_columns(col_widths=12):
-            with ui.card(full_screen=True):
+            with ui.card(full_screen=True, height="700px"):
                 with ui.card_header(class_="d-flex align-items-center"):
                     ui.span("AI Exposure by Sub-Domain")
                     with ui.span(class_="ms-auto"):
@@ -126,7 +126,7 @@ with ui.navset_pill(id="main_tabs"):
                         int(app_input.occ_year()),
                     )
 
-            with ui.card(full_screen=True):
+            with ui.card(full_screen=True, height="700px"):
                 with ui.card_header(class_="d-flex align-items-center"):
                     ui.span("Monthly Employment Count")
                     with ui.span(class_="ms-auto"):
@@ -149,7 +149,7 @@ with ui.navset_pill(id="main_tabs"):
                     df = occ_employment().to_pandas()
                     return build_employment_count_chart(df, app_input.occ_occupation())
 
-            with ui.card(full_screen=True):
+            with ui.card(full_screen=True, height="700px"):
                 with ui.card_header(class_="d-flex align-items-center"):
                     ui.span("Monthly Employment Change")
                     with ui.span(class_="ms-auto"):
@@ -191,7 +191,7 @@ with ui.navset_pill(id="main_tabs"):
             )
 
         # Employment summary table
-        with ui.card():
+        with ui.card(fill=True, fillable=True):
             ui.card_header("Occupations Summary")
 
             @render.ui
@@ -207,33 +207,13 @@ with ui.navset_pill(id="main_tabs"):
                     occs,
                     int(app_input.comp_year()),
                 ).to_pandas()
-                return as_great_table_html(df, METRICS)
-
-        # Employment comparison line chart
-        with ui.card(full_screen=True):
-            with ui.card_header(class_="d-flex align-items-center"):
-                ui.span("Monthly Employment Change")
-                with ui.span(class_="ms-auto"):
-
-                    @render.download(
-                        filename="comparison_employment.png",
-                        media_type="image/png",
-                        label=fa.icon_svg("download"),
-                    )
-                    async def dl_comp_employment():
-                        yield export_fig(
-                            build_comparison_employment_plot(
-                                comparison_data().to_pandas(),
-                            ),
-                        )
-
-            @render_widget
-            def comp_employment_chart():
-                df = comparison_data().to_pandas()
-                return build_comparison_employment_plot(df)
+                return ui.div(
+                    as_great_table_html(df, METRICS),
+                    style="overflow: auto; width: 100%; height: 100%;",
+                )
 
         # AI percentile radar chart
-        with ui.card(full_screen=True):
+        with ui.card(full_screen=True, height="700px"):
             with ui.card_header(class_="d-flex align-items-center"):
                 ui.span("AI Percentile Radar Comparison")
                 with ui.span(class_="ms-auto"):
@@ -255,6 +235,29 @@ with ui.navset_pill(id="main_tabs"):
             def comp_radar_chart():
                 df = comp_radar_data().to_pandas()
                 return build_comp_radar_plot(df, METRICS)
+
+        # Employment comparison line chart
+        with ui.card(full_screen=True, height="700px"):
+            with ui.card_header(class_="d-flex align-items-center"):
+                ui.span("Monthly Employment Change")
+                with ui.span(class_="ms-auto"):
+
+                    @render.download(
+                        filename="comparison_employment.png",
+                        media_type="image/png",
+                        label=fa.icon_svg("download"),
+                    )
+                    async def dl_comp_employment():
+                        yield export_fig(
+                            build_comparison_employment_plot(
+                                comparison_data().to_pandas(),
+                            ),
+                        )
+
+            @render_widget
+            def comp_employment_chart():
+                df = comparison_data().to_pandas()
+                return build_comparison_employment_plot(df)
 
     # ── Tab 3: Download ───────────────────────────────────────
 
@@ -291,11 +294,25 @@ with ui.navset_pill(id="main_tabs"):
                 df = download_frame().to_pandas()
                 yield export_filtered_data(df, app_input.dl_format())
 
-        # Row count
-        @render.ui
-        def dl_row_count():
-            n = len(download_frame())
-            return ui.p(f"{n:,} rows match the current filters.", class_="text-muted")
+        ui.p(
+            "Export the filtered row-level dataset or inspect a compact preview before downloading.",
+            class_="text-muted mb-3",
+        )
+
+        with ui.layout_columns(col_widths=[6, 6]):
+            with ui.value_box(theme="primary"):
+                "Rows"
+
+                @render.text
+                def dl_row_count():
+                    return f"{len(download_frame()):,}"
+
+            with ui.value_box(theme="primary"):
+                "Columns"
+
+                @render.text
+                def dl_col_count():
+                    return f"{len(download_frame().columns):,}"
 
         # Data preview
         with ui.card(full_screen=True):
