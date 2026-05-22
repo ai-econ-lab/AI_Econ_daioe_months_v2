@@ -1,51 +1,15 @@
-# Python
+# Python-generated files
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
+*.py[oc]
 build/
-develop-eggs/
 dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
 wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
+*.egg-info
 
-# UV & Virtual Environments
-.venv/
-uv.lock
-.python-version
-.ruff_cache/
+.ruff_cache
 
-# IDEs
-.vscode/
-.idea/
-.positron/
-*.swp
-*.swo
-
-# Project Specific - Data
-# We ignore the generated output and cached parquet files 
-# but keep the structure if needed.
-data/*.parquet
-!data/.gitkeep
-
-# Project Specific - Shiny
-.shiny/
-auth.json
-
-# OS
-.DS_Store
-Thumbs.db
+# Virtual environments
+.venv
+.vscode
+.claude
+CLAUDE.md
