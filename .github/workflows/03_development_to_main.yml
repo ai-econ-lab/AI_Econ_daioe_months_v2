@@ -66,6 +66,7 @@ jobs:
             "src/calcs.py"
             "src/visuals.py"
             "md_files/intro.md"
+            "README.md"
           )
 
           for file in "${required_files[@]}"; do
@@ -96,11 +97,8 @@ jobs:
             "src/calcs.py"
             "src/visuals.py"
             "md_files/intro.md"
+            "README.md"
           )
-
-          if [ -f "README.md" ]; then
-            files+=("README.md")
-          fi
 
           tar -czf ../deploy-files.tgz "${files[@]}"
 
@@ -138,11 +136,8 @@ jobs:
             src/utils.py \
             src/calcs.py \
             src/visuals.py \
-            md_files/intro.md
-
-          if [ -f "README.md" ]; then
-            git add README.md
-          fi
+            md_files/intro.md \
+            README.md
 
           if git diff --cached --quiet; then
             echo "No changes to commit."
