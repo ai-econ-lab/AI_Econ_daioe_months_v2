@@ -73,7 +73,10 @@ def as_great_table_html(df: pd.DataFrame, metrics: dict[str, str]) -> ui.TagChil
     gt = (
         GT(df_display)
         .opt_row_striping()
-        .tab_options(table_font_names=["Nunito Sans", "Arial", "sans-serif"])
+        .tab_options(
+            table_font_names=["Nunito Sans", "Arial", "sans-serif"],
+            table_width="100%",
+        )
         .opt_stylize(style=2, color="blue")
     )
 
