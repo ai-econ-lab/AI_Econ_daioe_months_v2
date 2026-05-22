@@ -31,8 +31,12 @@ def get_occ_summary(lf: pl.LazyFrame, occupation: str, year: int) -> dict | None
                 pl.col("year").first(),
             ],
         )
-        .sort("month", descending=True)
+        .with_columns(
+            pl.col("month").str.strptime(pl.Date, "%Y-%b").alias("_month_date"),
+        )
+        .sort("_month_date", descending=True)
         .head(1)
+        .drop("_month_date")
         .collect()
     )
 
@@ -42,7 +46,7 @@ def get_occ_summary(lf: pl.LazyFrame, occupation: str, year: int) -> dict | None
     row = df.row(0, named=True)
 
     def _or_none(v: float | None) -> float | None:
-        return None if v is None else float(v)
+        return None if v is None else v
 
     return {
         "employment": row["emp_count"],
