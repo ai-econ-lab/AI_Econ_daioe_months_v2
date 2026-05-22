@@ -6,15 +6,11 @@ dist/
 wheels/
 *.egg-info
 
-# UV & Virtual Environments
-.venv/
-uv.lock
-.python-version
-.ruff_cache/
+.ruff_cache
 
 # Virtual environments
 .venv
 .vscode
 .claude
-.antigravitycli/s
+.antigravitycli/
 CLAUDE.md
