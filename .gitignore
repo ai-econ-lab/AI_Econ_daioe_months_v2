@@ -16,4 +16,5 @@ uv.lock
 .venv
 .vscode
 .claude
+.antigravitycli/s
 CLAUDE.md
