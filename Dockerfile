@@ -34,6 +34,8 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 # Copy only what the app needs at runtime
 COPY app.py ./app.py
+COPY src ./src
+COPY md_files ./md_files
 COPY data ./data
 COPY logos ./logos
 COPY _brand.yml ./_brand.yml
