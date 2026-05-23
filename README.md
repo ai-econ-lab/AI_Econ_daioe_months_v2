@@ -9,5 +9,3 @@ pinned: false
 ---
 
 # DAIOE Monthly Explorer: Swedish Occupations
-
-check
