@@ -22,6 +22,14 @@ _C_TITLE = "#0C0A3E"
 _FONT_BASE = "Nunito Sans"
 _FONT_HEAD = "Montserrat"
 
+def _nullify(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
+    """Replace NaN with Python None in specified columns so Plotly serialises them as JSON null."""
+    for col in cols:
+        if col in df.columns:
+            df[col] = df[col].astype(object).where(pd.notna(df[col]), None)
+    return df
+
+
 _BASE_LAYOUT: dict = {
     "paper_bgcolor": _C_BG,
     "plot_bgcolor": _C_BG,
@@ -36,8 +44,8 @@ def build_value_boxes(summary: dict, occupation: str) -> ui.Tag:
     """
     Build the employment summary value boxes for a given occupation.
 
-    Returns a div containing a heading, four value boxes (employment,
-    1/3/6-month change), and a markdown source note.
+    Returns a div containing a heading, three value boxes (employment count,
+    1-month change, 3-month change), and a markdown source note.
     """
 
     def _arrow(v: float) -> str:
@@ -102,7 +110,12 @@ def build_employment_count_chart(df: pd.DataFrame, occupation: str) -> go.Figure
     if df.empty:
         return go.Figure()
 
-    df = df.fillna(0)
+    df = df.assign(
+        emp_count=df["emp_count"].fillna(0),
+        pct_chg_1m_label=df["pct_chg_1m"].apply(
+            lambda v: f"{v:.1f}%" if pd.notna(v) else "N/A"
+        ),
+    )
     df = (
         df.assign(_date=pd.to_datetime(df["month"], format="%Y-%b"))
         .sort_values("_date")
@@ -119,7 +132,7 @@ def build_employment_count_chart(df: pd.DataFrame, occupation: str) -> go.Figure
         x="month",
         y="emp_count",
         markers=True,
-        custom_data=["pct_chg_1m"],
+        custom_data=["pct_chg_1m_label"],
         labels={
             "month": "Month",
             "emp_count": "Employment",
@@ -130,7 +143,7 @@ def build_employment_count_chart(df: pd.DataFrame, occupation: str) -> go.Figure
         hovertemplate=(
             "Month: %{x}<br>"
             "Employment: %{y:,.0f}<br>"
-            "1-mo Change: %{customdata[0]:.1f}%<extra></extra>"
+            "1-mo Change: %{customdata[0]}<extra></extra>"
         ),
     )
     fig.update_layout(
@@ -156,7 +169,8 @@ def build_employment_chart(df: pd.DataFrame, occupation: str) -> go.Figure:
     if df.empty:
         return go.Figure()
 
-    df = df.fillna(0)
+    df = df.assign(emp_count=df["emp_count"].fillna(0))
+    df = _nullify(df, ["pct_chg_1m"])
     df = (
         df.assign(_date=pd.to_datetime(df["month"], format="%Y-%b"))
         .sort_values("_date")
@@ -208,7 +222,8 @@ def build_comparison_employment_plot(df: pd.DataFrame) -> go.Figure:
     if df.empty:
         return go.Figure()
 
-    df = df.fillna(0)
+    df = df.assign(emp_count=df["emp_count"].fillna(0))
+    df = _nullify(df, ["pct_chg_1m"])
     df = (
         df.assign(_date=pd.to_datetime(df["month"], format="%Y-%b"))
         .sort_values(["occupation", "_date"])
