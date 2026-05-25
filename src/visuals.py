@@ -68,7 +68,10 @@ def build_value_boxes(summary: dict, occupation: str) -> ui.Tag:
     month = summary.get("month", str(year))
 
     return ui.div(
-        ui.h6(f"National Employment of {occupation}", class_="mt-3 mb-2 fw-semibold"),
+        ui.h6(
+            f"National Employment of {occupation} (All Sexes)",
+            class_="mt-3 mb-2 fw-semibold",
+        ),
         ui.layout_columns(
             ui.value_box(
                 title="Employment (thousands)",
@@ -137,11 +140,13 @@ def _occ_chips(
     """Build the chip list for one occupation row."""
     occ = row["occupation"]
     emp = row["emp_count"]
-    emp_str = f"{int(emp * 1_000):,}" if emp is not None and not pd.isna(emp) else "N/A"
+    emp_str = (
+        f"{round(emp * 1_000):,}" if emp is not None and not pd.isna(emp) else "N/A"
+    )
 
     chips: list[ui.Tag] = [
         _ticker_chip("Occupation", occ),
-        _ticker_chip("Employment", emp_str),
+        _ticker_chip("Employment (people)", emp_str),
         _ticker_chip(
             "1-month change",
             _ticker_fmt_pct(row["pct_chg_1m"]),
@@ -194,8 +199,9 @@ def build_occupation_ribbon(
         return ui.div()
 
     content = ui.div(*items, class_="ticker-content")
+    duplicate = ui.div(*items, class_="ticker-content", aria_hidden="true")
     return ui.div(
-        ui.div(content, content, class_="ticker-track", aria_hidden="true"),
+        ui.div(content, duplicate, class_="ticker-track"),
         class_="occupation-ticker",
         role="region",
         aria_label="All occupations ticker",
@@ -232,6 +238,8 @@ def build_employment_count_chart(df: pd.DataFrame, occupation: str) -> go.Figure
         labels={"_date": "Month", "emp_count": "Employment", "sex": "Sex"},
     )
     fig.update_traces(
+        line={"width": 3},
+        marker={"size": 8},
         hovertemplate=(
             "Month: %{customdata[1]}<br>"
             "Employment: %{y:,.0f}<br>"
@@ -300,6 +308,8 @@ def build_employment_chart(df: pd.DataFrame, occupation: str) -> go.Figure:
         labels={"_date": "Month", "pct_chg_1m": "Employment change (%)", "sex": "Sex"},
     )
     fig.update_traces(
+        line={"width": 3},
+        marker={"size": 8},
         hovertemplate=(
             "Month: %{customdata[1]}<br>"
             "Change: %{y:.1f}%<br>"
@@ -363,6 +373,8 @@ def build_comparison_employment_plot(df: pd.DataFrame) -> go.Figure:
         labels={"pct_chg_1m": "Employment Change (%)", "_date": "Month"},
     )
     fig.update_traces(
+        line={"width": 3},
+        marker={"size": 8},
         hovertemplate=(
             "<b>%{fullData.name}</b><br>"
             "Month: %{customdata[1]}<br>"
@@ -374,6 +386,11 @@ def build_comparison_employment_plot(df: pd.DataFrame) -> go.Figure:
     fig.add_hline(y=0, line_color="grey", line_width=1)
     fig.update_layout(
         **_BASE_LAYOUT,
+        title={
+            "text": "Monthly Employment Change by Occupation in Sweden",
+            "x": 0.01,
+            "xanchor": "left",
+        },
         legend={
             "orientation": "h",
             "yanchor": "bottom",
