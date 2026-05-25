@@ -24,3 +24,8 @@ venvPath = "."
 venv = ".venv"
 extraPaths = ["."]
 reportArgumentType = false
+
+[dependency-groups]
+dev = [
+    "playwright>=1.60.0",
+]
