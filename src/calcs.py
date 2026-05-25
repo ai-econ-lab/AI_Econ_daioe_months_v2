@@ -9,12 +9,34 @@ from .constants import (
 )
 
 
+def _null_safe_sum(col: str) -> pl.Expr:
+    """Sum a change column, returning null (not 0) when every value in the group is null."""
+    return (
+        pl.when(pl.col(col).is_null().all())
+        .then(pl.lit(None, dtype=pl.Float64))
+        .otherwise(pl.col(col).sum())
+        .alias(col)
+    )
+
+
+def _safe_pct(chg_col: str, emp_col: str, alias: str) -> pl.Expr:
+    """Derive pct change from aggregated totals: chg / prev_emp * 100, null-safe."""
+    prev = pl.col(emp_col) - pl.col(chg_col)
+    return (
+        pl.when(pl.col(chg_col).is_not_null() & (prev != 0))
+        .then(pl.col(chg_col) / prev * 100)
+        .otherwise(None)
+        .alias(alias)
+    )
+
+
 def get_occ_summary(lf: pl.LazyFrame, occupation: str, year: int) -> dict | None:
     """
     Return employment and percentage changes for the latest month of the given year.
 
-    Sums emp_count across sexes per month, then picks the most recent month.
-    Returns a dict with keys: employment, pct_1m, pct_3m, pct_6m, year, month.
+    Sums emp_count and chg columns across sexes per month, derives pct changes from
+    aggregated totals, then picks the most recent month.
+    Returns a dict with keys: employment, pct_1m, pct_3m, year, month.
     Returns None if no data matches the filters.
     """
     df = (
@@ -25,14 +47,17 @@ def get_occ_summary(lf: pl.LazyFrame, occupation: str, year: int) -> dict | None
         .agg(
             [
                 pl.col("emp_count").sum(),
-                pl.col("pct_chg_1m").mean(),
-                pl.col("pct_chg_3m").mean(),
-                pl.col("pct_chg_6m").mean(),
+                _null_safe_sum("chg_1m"),
+                _null_safe_sum("chg_3m"),
                 pl.col("year").first(),
             ],
         )
         .with_columns(
-            pl.col("month").str.strptime(pl.Date, "%Y-%b").alias("_month_date"),
+            [
+                _safe_pct("chg_1m", "emp_count", "pct_chg_1m"),
+                _safe_pct("chg_3m", "emp_count", "pct_chg_3m"),
+                pl.col("month").str.strptime(pl.Date, "%Y-%b").alias("_month_date"),
+            ],
         )
         .sort("_month_date", descending=True)
         .head(1)
@@ -45,14 +70,10 @@ def get_occ_summary(lf: pl.LazyFrame, occupation: str, year: int) -> dict | None
 
     row = df.row(0, named=True)
 
-    def _or_none(v: float | None) -> float | None:
-        return None if v is None else v
-
     return {
         "employment": row["emp_count"],
-        "pct_1m": _or_none(row["pct_chg_1m"]),
-        "pct_3m": _or_none(row["pct_chg_3m"]),
-        "pct_6m": _or_none(row["pct_chg_6m"]),
+        "pct_1m": row["pct_chg_1m"],
+        "pct_3m": row["pct_chg_3m"],
         "year": int(row["year"]),
         "month": str(row["month"]),
     }
@@ -109,7 +130,7 @@ def get_occ_employment(
     """
     Return total monthly employment and 1-month % change for a given occupation and year range.
 
-    Aggregates across all sexes: sums emp_count, means pct_chg_1m.
+    Aggregates across all sexes: sums emp_count and chg_1m, derives pct_chg_1m from totals.
     Returns a DataFrame with columns: year, month, emp_count, pct_chg_1m.
     """
     year_min, year_max = year_range
@@ -123,11 +144,14 @@ def get_occ_employment(
         .agg(
             [
                 pl.col("emp_count").sum(),
-                pl.col("pct_chg_1m").mean(),
+                _null_safe_sum("chg_1m"),
             ],
         )
         .with_columns(
-            pl.col("month").str.strptime(pl.Date, "%Y-%b").alias("_date"),
+            [
+                _safe_pct("chg_1m", "emp_count", "pct_chg_1m"),
+                pl.col("month").str.strptime(pl.Date, "%Y-%b").alias("_date"),
+            ],
         )
         .sort("_date")
         .drop("_date")
@@ -142,7 +166,7 @@ def get_comparison_employment(
     """
     Return total employment and 1-month % change per year/month/occupation for the comparison view.
 
-    Aggregates across all sexes: sums emp_count, means pct_chg_1m.
+    Aggregates across all sexes: sums emp_count and chg_1m, derives pct_chg_1m from totals.
     Returns a DataFrame with columns: year, month, occupation, emp_count, pct_chg_1m.
     """
     return (
@@ -151,11 +175,14 @@ def get_comparison_employment(
         .agg(
             [
                 pl.col("emp_count").sum(),
-                pl.col("pct_chg_1m").mean(),
+                _null_safe_sum("chg_1m"),
             ],
         )
         .with_columns(
-            pl.col("month").str.strptime(pl.Date, "%Y-%b").alias("_date"),
+            [
+                _safe_pct("chg_1m", "emp_count", "pct_chg_1m"),
+                pl.col("month").str.strptime(pl.Date, "%Y-%b").alias("_date"),
+            ],
         )
         .sort(["occupation", "_date"])
         .drop("_date")
@@ -169,22 +196,41 @@ def get_comp_summary(
     year: int,
 ) -> pl.DataFrame:
     """
-    Return a per-occupation employment summary for the selected year.
+    Return a per-occupation employment snapshot for the latest month of the selected year.
 
-    Aggregates across all sexes and months.
+    Groups by occupation + month, sums across sexes, derives pct changes from aggregated totals,
+    then picks the most recent month per occupation.
     Returns a DataFrame with columns: occupation, emp_count, pct_chg_1m, pct_chg_3m, pct_chg_6m.
     """
     return (
         lf.filter(
             pl.col("occupation").is_in(occupations) & (pl.col("year") == year),
         )
+        .group_by(["occupation", "month"])
+        .agg(
+            [
+                pl.col("emp_count").sum(),
+                _null_safe_sum("chg_1m"),
+                _null_safe_sum("chg_3m"),
+                _null_safe_sum("chg_6m"),
+            ],
+        )
+        .with_columns(
+            [
+                _safe_pct("chg_1m", "emp_count", "pct_chg_1m"),
+                _safe_pct("chg_3m", "emp_count", "pct_chg_3m"),
+                _safe_pct("chg_6m", "emp_count", "pct_chg_6m"),
+                pl.col("month").str.strptime(pl.Date, "%Y-%b").alias("_month_date"),
+            ],
+        )
+        .sort(["occupation", "_month_date"], descending=[False, True])
         .group_by("occupation")
         .agg(
             [
-                pl.col("emp_count").mean().alias("emp_count"),
-                pl.col("pct_chg_1m").mean().alias("pct_chg_1m"),
-                pl.col("pct_chg_3m").mean().alias("pct_chg_3m"),
-                pl.col("pct_chg_6m").mean().alias("pct_chg_6m"),
+                pl.first("emp_count"),
+                pl.first("pct_chg_1m"),
+                pl.first("pct_chg_3m"),
+                pl.first("pct_chg_6m"),
             ],
         )
         .sort("occupation")
