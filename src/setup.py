@@ -86,6 +86,7 @@ first_cols = [
 # Shared UI Helpers
 # ---------------------------------------------------
 
+
 def apply_plot_style(fig: go.Figure, brand: dict[str, str]) -> go.Figure:
     """Apply a consistent visual style to Plotly charts."""
     fig.update_layout(
@@ -112,6 +113,7 @@ def empty_figure(message: str, brand: dict[str, str]) -> go.Figure:
 # ---------------------------------------------------
 # Shared Table/Label Helpers
 # ---------------------------------------------------
+
 
 def metric_display_name(metric_key: str, metrics: dict[str, str]) -> str:
     """Return a clean human-readable metric label without leading icons."""
@@ -190,6 +192,7 @@ def as_great_table_html(df: pd.DataFrame, metrics: dict[str, str]) -> ui.TagChil
 # ---------------------------------------------------
 # Shared Download Helpers
 # ---------------------------------------------------
+
 
 def download_extension(fmt: str) -> str:
     """Map selected download format to its file extension."""

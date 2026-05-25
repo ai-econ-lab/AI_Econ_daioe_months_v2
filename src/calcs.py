@@ -30,7 +30,19 @@ def _safe_pct(chg_col: str, emp_col: str, alias: str) -> pl.Expr:
     )
 
 
-def get_occ_summary(lf: pl.LazyFrame, occupation: str, year: int) -> dict | None:
+def _sex_filter(lf: pl.LazyFrame, sex: str) -> pl.LazyFrame:
+    """Filter by sex; 'All' is a no-op."""
+    if sex == "All":
+        return lf
+    return lf.filter(pl.col("sex") == sex)
+
+
+def get_occ_summary(
+    lf: pl.LazyFrame,
+    occupation: str,
+    year: int,
+    sex: str = "All",
+) -> dict | None:
     """
     Return employment and percentage changes for the latest month of the given year.
 
@@ -40,7 +52,8 @@ def get_occ_summary(lf: pl.LazyFrame, occupation: str, year: int) -> dict | None
     Returns None if no data matches the filters.
     """
     df = (
-        lf.filter(
+        _sex_filter(lf, sex)
+        .filter(
             (pl.col("occupation") == occupation) & (pl.col("year") == year),
         )
         .group_by("month")
@@ -126,51 +139,64 @@ def get_occ_employment(
     lf: pl.LazyFrame,
     occupation: str,
     year_range: tuple[int, int],
+    extra_sexes: tuple[str, ...] = (),
 ) -> pl.DataFrame:
     """
-    Return total monthly employment and 1-month % change for a given occupation and year range.
+    Return monthly employment data with optional per-sex breakdowns.
 
-    Aggregates across all sexes: sums emp_count and chg_1m, derives pct_chg_1m from totals.
-    Returns a DataFrame with columns: year, month, emp_count, pct_chg_1m.
+    Always includes an 'All' series (aggregate across sexes).
+    Pass extra_sexes to overlay individual sex lines (e.g. ('women', 'men')).
+    Returns a DataFrame with columns: year, month, sex, emp_count, pct_chg_1m.
     """
     year_min, year_max = year_range
-    return (
-        lf.filter(
-            (pl.col("occupation") == occupation)
-            & (pl.col("year") >= year_min)
-            & (pl.col("year") <= year_max),
-        )
-        .group_by(["year", "month"])
-        .agg(
-            [
-                pl.col("emp_count").sum(),
-                _null_safe_sum("chg_1m"),
-            ],
-        )
-        .with_columns(
-            [
-                _safe_pct("chg_1m", "emp_count", "pct_chg_1m"),
-                pl.col("month").str.strptime(pl.Date, "%Y-%b").alias("_date"),
-            ],
-        )
-        .sort("_date")
-        .drop("_date")
-        .collect()
+    base = lf.filter(
+        (pl.col("occupation") == occupation)
+        & (pl.col("year") >= year_min)
+        & (pl.col("year") <= year_max),
     )
+
+    def _monthly(lf_in: pl.LazyFrame, label: str) -> pl.DataFrame:
+        return (
+            lf_in.group_by(["year", "month"])
+            .agg(
+                [
+                    pl.col("emp_count").sum(),
+                    _null_safe_sum("chg_1m"),
+                ],
+            )
+            .with_columns(
+                [
+                    _safe_pct("chg_1m", "emp_count", "pct_chg_1m"),
+                    pl.col("month").str.strptime(pl.Date, "%Y-%b").alias("_date"),
+                    pl.lit(label).alias("sex"),
+                ],
+            )
+            .sort("_date")
+            .drop("_date")
+            .collect()
+        )
+
+    frames = [_monthly(base, "All")]
+    for s in extra_sexes:
+        frames.append(_monthly(base.filter(pl.col("sex") == s), s.capitalize()))
+
+    return pl.concat(frames)
 
 
 def get_comparison_employment(
     lf: pl.LazyFrame,
     occupations: list[str],
+    sex: str = "All",
 ) -> pl.DataFrame:
     """
     Return total employment and 1-month % change per year/month/occupation for the comparison view.
 
-    Aggregates across all sexes: sums emp_count and chg_1m, derives pct_chg_1m from totals.
+    Aggregates across the selected sex (or all sexes when sex='All').
     Returns a DataFrame with columns: year, month, occupation, emp_count, pct_chg_1m.
     """
     return (
-        lf.filter(pl.col("occupation").is_in(occupations))
+        _sex_filter(lf, sex)
+        .filter(pl.col("occupation").is_in(occupations))
         .group_by(["year", "month", "occupation"])
         .agg(
             [
@@ -194,16 +220,18 @@ def get_comp_summary(
     lf: pl.LazyFrame,
     occupations: list[str],
     year: int,
+    sex: str = "All",
 ) -> pl.DataFrame:
     """
     Return a per-occupation employment summary for the latest month of the selected year.
 
-    Groups by occupation + month, sums across sexes, derives pct changes from aggregated totals,
-    then picks the most recent month per occupation.
+    Groups by occupation + month, aggregates for the selected sex (or all sexes),
+    derives pct changes from aggregated totals, then picks the most recent month per occupation.
     Returns a DataFrame with columns: occupation, emp_count, pct_chg_1m, pct_chg_3m, pct_chg_6m.
     """
     return (
-        lf.filter(
+        _sex_filter(lf, sex)
+        .filter(
             pl.col("occupation").is_in(occupations) & (pl.col("year") == year),
         )
         .group_by(["occupation", "month"])
@@ -232,15 +260,16 @@ def get_comp_summary(
     )
 
 
-def get_all_occ_summary(lf: pl.LazyFrame, year: int) -> pl.DataFrame:
+def get_all_occ_summary(lf: pl.LazyFrame, year: int, sex: str = "All") -> pl.DataFrame:
     """
     Return latest-month employment summary for every occupation in the given year.
 
-    Aggregates across sexes and picks the most recent month per occupation.
+    Aggregates for the selected sex (or all sexes) and picks the most recent month per occupation.
     Returns a DataFrame with columns: occupation, emp_count, pct_chg_1m, pct_chg_3m.
     """
     return (
-        lf.filter(pl.col("year") == year)
+        _sex_filter(lf, sex)
+        .filter(pl.col("year") == year)
         .group_by(["occupation", "month"])
         .agg(
             [
