@@ -61,19 +61,6 @@ _DEFAULT_OCC = OCCS[0] if OCCS else None
 _SEX_CHOICES = {"All": "All", **{s: s.capitalize() for s in SEXES}}
 
 
-# # ── Page header ───────────────────────────────────────────────
-
-# ui.div(
-#     ui.h4("Swedish Occupations, Employment & AI Exposure", class_="mb-1 fw-bold"),
-#     ui.p(
-#         "Explore how monthly employment has changed across Swedish occupation groups "
-#         "and compare those trends with AI exposure scores from the DAIOE framework. "
-#         f"Coverage: Sweden, {MONTH_EARLIEST} to {MONTH_LATEST}, updated monthly.",
-#         class_="text-muted mb-0 small",
-#     ),
-#     class_="py-2 px-3 border-bottom",
-# )
-
 # ── Tab navigation ────────────────────────────────────────────
 
 with ui.navset_pill(id="main_tabs"):
@@ -104,10 +91,10 @@ with ui.navset_pill(id="main_tabs"):
             )
             ui.input_selectize(
                 "occ_sex",
-                "Add sex breakdown",
+                "Show sex lines",
                 choices={s: s.capitalize() for s in SEXES},
                 multiple=True,
-                options={"placeholder": "Select to add lines..."},
+                options={"placeholder": "Select to overlay..."},
             )
             ui.input_select(
                 "occ_year",
@@ -222,7 +209,7 @@ with ui.navset_pill(id="main_tabs"):
                     ui.span("Employment (thousands)")
                     with ui.popover(placement="bottom"):
                         fa.icon_svg("circle-info", height="1.2em")
-                        "Total national employment in thousands of people, for the selected sex."
+                        "Total national employment in thousands of people (all sexes combined). Use 'Show sex lines' to overlay per-sex trends."
                     with ui.span(class_="ms-auto"):
 
                         @render.download(
@@ -436,6 +423,13 @@ with ui.navset_pill(id="main_tabs"):
 
     with ui.nav_panel("About"), ui.card(fill=True, fillable=True):
         ui.card_header("About This Dashboard")
+        ui.div(
+            ui.img(
+                src="/logos/lab.svg",
+                alt="AI-Econ Lab logo",
+                style="height:60px; display:block; margin:1rem 0 1.5rem;",
+            ),
+        )
         ui.markdown(ABOUT_MD)
 
 
