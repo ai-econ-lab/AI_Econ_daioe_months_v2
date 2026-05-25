@@ -196,7 +196,7 @@ def get_comp_summary(
     year: int,
 ) -> pl.DataFrame:
     """
-    Return a per-occupation employment snapshot for the latest month of the selected year.
+    Return a per-occupation employment summary for the latest month of the selected year.
 
     Groups by occupation + month, sums across sexes, derives pct changes from aggregated totals,
     then picks the most recent month per occupation.
@@ -225,16 +225,74 @@ def get_comp_summary(
         )
         .sort(["occupation", "_month_date"], descending=[False, True])
         .group_by("occupation")
-        .agg(
-            [
-                pl.first("emp_count"),
-                pl.first("pct_chg_1m"),
-                pl.first("pct_chg_3m"),
-                pl.first("pct_chg_6m"),
-            ],
-        )
+        .head(1)
+        .select(["occupation", "emp_count", "pct_chg_1m", "pct_chg_3m", "pct_chg_6m"])
         .sort("occupation")
         .collect()
+    )
+
+
+def get_all_occ_summary(lf: pl.LazyFrame, year: int) -> pl.DataFrame:
+    """
+    Return latest-month employment summary for every occupation in the given year.
+
+    Aggregates across sexes and picks the most recent month per occupation.
+    Returns a DataFrame with columns: occupation, emp_count, pct_chg_1m, pct_chg_3m.
+    """
+    return (
+        lf.filter(pl.col("year") == year)
+        .group_by(["occupation", "month"])
+        .agg(
+            [
+                pl.col("emp_count").sum(),
+                _null_safe_sum("chg_1m"),
+                _null_safe_sum("chg_3m"),
+            ],
+        )
+        .with_columns(
+            [
+                _safe_pct("chg_1m", "emp_count", "pct_chg_1m"),
+                _safe_pct("chg_3m", "emp_count", "pct_chg_3m"),
+                pl.col("month").str.strptime(pl.Date, "%Y-%b").alias("_month_date"),
+            ],
+        )
+        .sort(["occupation", "_month_date"], descending=[False, True])
+        .group_by("occupation")
+        .head(1)
+        .select(["occupation", "emp_count", "pct_chg_1m", "pct_chg_3m"])
+        .sort("occupation")
+        .collect()
+    )
+
+
+def get_all_occ_ai_exposure(lf: pl.LazyFrame, year: int) -> pl.DataFrame:
+    """
+    Return AI percentile scores for every occupation, long format with domain labels.
+
+    Returns a DataFrame with columns: occupation, domain, percentile.
+    Sorted by occupation ascending, percentile descending within each occupation.
+    """
+    label_map = {col: AI_LABELS[col[5:]] for col in AI_PCTL_COLS}
+    wide_df = (
+        lf.filter(pl.col("year") == year)
+        .group_by("occupation")
+        .agg([pl.col(c).mean() for c in AI_PCTL_COLS])
+        .collect()
+    )
+    return (
+        wide_df.unpivot(
+            on=AI_PCTL_COLS,
+            index="occupation",
+            variable_name="pctl_col",
+            value_name="percentile",
+        )
+        .with_columns(
+            pl.col("pctl_col")
+            .replace(old=list(label_map.keys()), new=list(label_map.values()))
+            .alias("domain"),
+        )
+        .drop("pctl_col")
+        .sort(["occupation", "percentile"], descending=[False, True])
     )
 
 
