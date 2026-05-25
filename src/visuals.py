@@ -22,6 +22,7 @@ _C_TITLE = "#0C0A3E"
 _FONT_BASE = "Nunito Sans"
 _FONT_HEAD = "Montserrat"
 
+
 def _nullify(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
     """Replace NaN with Python None in specified columns so Plotly serialises them as JSON null."""
     for col in cols:
@@ -101,6 +102,106 @@ def build_value_boxes(summary: dict, occupation: str) -> ui.Tag:
     )
 
 
+def _ticker_chip(label: str, value: str, tone: str = "neutral") -> ui.Tag:
+    return ui.span(
+        ui.span(label, class_="ticker-label"),
+        ui.span(value, class_="ticker-value"),
+        class_=f"ticker-chip ticker-chip-{tone}",
+    )
+
+
+def _ticker_pct_tone(v: float | None) -> str:
+    if v is None or pd.isna(v):
+        return "neutral"
+    return "up" if v >= 0 else "down"
+
+
+def _ticker_fmt_pct(v: float | None) -> str:
+    if v is None or pd.isna(v):
+        return "N/A"
+    sign = "+" if v > 0 else ""
+    return f"{sign}{v:.1f}%"
+
+
+def _ticker_fmt_percentile(v: float | None) -> str:
+    if v is None or pd.isna(v):
+        return "N/A"
+    return f"{v:,.0f}th percentile"
+
+
+def _occ_chips(
+    row: pd.Series,
+    ai_rows: pd.DataFrame,
+    year: int,
+) -> list[ui.Tag]:
+    """Build the chip list for one occupation row."""
+    occ = row["occupation"]
+    emp = row["emp_count"]
+    emp_str = f"{int(emp * 1_000):,}" if emp is not None and not pd.isna(emp) else "N/A"
+
+    chips: list[ui.Tag] = [
+        _ticker_chip("Occupation", occ),
+        _ticker_chip("Employment", emp_str),
+        _ticker_chip(
+            "1-month change",
+            _ticker_fmt_pct(row["pct_chg_1m"]),
+            _ticker_pct_tone(row["pct_chg_1m"]),
+        ),
+        _ticker_chip(
+            "3-month change",
+            _ticker_fmt_pct(row["pct_chg_3m"]),
+            _ticker_pct_tone(row["pct_chg_3m"]),
+        ),
+        _ticker_chip("Year", str(year)),
+    ]
+    for _, ai_row in ai_rows.iterrows():
+        chips.append(
+            _ticker_chip(
+                str(ai_row["domain"]),
+                _ticker_fmt_percentile(ai_row["percentile"]),
+            ),
+        )
+    return chips
+
+
+def build_occupation_ribbon(
+    summary_df: pd.DataFrame,
+    ai_df: pd.DataFrame,
+    year: int,
+) -> ui.Tag:
+    """
+    Build a continuously scrolling ribbon showing all occupations.
+
+    summary_df: columns occupation, emp_count, pct_chg_1m, pct_chg_3m (one row per occ).
+    ai_df: columns occupation, domain, percentile (long format, sorted by percentile desc).
+    """
+    ai_by_occ: dict[str, pd.DataFrame] = (
+        {occ: grp for occ, grp in ai_df.groupby("occupation", sort=False)}  # noqa: C416
+        if not ai_df.empty
+        else {}
+    )
+
+    sep = ui.span("·", class_="ticker-sep")
+    items: list[ui.Tag] = []
+    for _, row in summary_df.iterrows():
+        if items:
+            items.append(sep)
+        items.extend(
+            _occ_chips(row, ai_by_occ.get(row["occupation"], pd.DataFrame()), year),
+        )
+
+    if not items:
+        return ui.div()
+
+    content = ui.div(*items, class_="ticker-content")
+    return ui.div(
+        ui.div(content, content, class_="ticker-track", aria_hidden="true"),
+        class_="occupation-ticker",
+        role="region",
+        aria_label="All occupations ticker",
+    )
+
+
 def build_employment_count_chart(df: pd.DataFrame, occupation: str) -> go.Figure:
     """
     Build a Plotly line chart of total monthly employment count over time.
@@ -112,7 +213,7 @@ def build_employment_count_chart(df: pd.DataFrame, occupation: str) -> go.Figure
 
     df = df.assign(
         emp_count=df["emp_count"].fillna(0),
-        pct_chg_1m_label=df["pct_chg_1m"].apply(
+        pct_chg_1m_label=df["pct_chg_1m"].map(
             lambda v: f"{v:.1f}%" if pd.notna(v) else "N/A",
         ),
         _date=pd.to_datetime(df["month"], format="%Y-%b"),
@@ -164,7 +265,9 @@ def build_employment_chart(df: pd.DataFrame, occupation: str) -> go.Figure:
 
     df = df.assign(emp_count=df["emp_count"].fillna(0))
     df = _nullify(df, ["pct_chg_1m"])
-    df = df.assign(_date=pd.to_datetime(df["month"], format="%Y-%b")).sort_values("_date")
+    df = df.assign(_date=pd.to_datetime(df["month"], format="%Y-%b")).sort_values(
+        "_date",
+    )
 
     fig = px.line(
         df,

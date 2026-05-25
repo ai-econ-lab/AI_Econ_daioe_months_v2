@@ -8,6 +8,8 @@ from shiny.express import input as app_input
 from shinywidgets import render_widget
 
 from src.calcs import (
+    get_all_occ_ai_exposure,
+    get_all_occ_summary,
     get_comp_radar,
     get_comp_summary,
     get_comparison_employment,
@@ -38,17 +40,21 @@ from src.visuals import (
     build_comparison_employment_plot,
     build_employment_chart,
     build_employment_count_chart,
+    build_occupation_ribbon,
     build_value_boxes,
     export_fig,
 )
 
 LOGOS_PATH = Path(__file__).parent / "logos"
-app_opts(static_assets={"/logos": LOGOS_PATH})
+CSS_PATH = Path(__file__).parent / "css"
+app_opts(static_assets={"/logos": LOGOS_PATH, "/css": CSS_PATH})
 
 ui.page_opts(
     fillable=True,
     theme=ui.Theme.from_brand(__file__),
 )
+
+ui.tags.link(rel="stylesheet", href="/css/ticker.css")
 
 _DEFAULT_OCC = OCCS[0] if OCCS else None
 
@@ -96,12 +102,12 @@ with ui.navset_pill(id="main_tabs"):
             )
             ui.input_select(
                 "occ_year",
-                "AI exposure year",
+                "Year",
                 choices={str(y): str(y) for y in YEARS},
                 selected=str(YEAR_MAX),
             )
             ui.p(
-                "Year for the AI exposure snapshot.",
+                "Year for the AI exposure scores.",
                 class_="text-muted small mt-n1 mb-2",
             )
             ui.hr()
@@ -116,6 +122,17 @@ with ui.navset_pill(id="main_tabs"):
             )
 
         # Value boxes
+        @render.ui
+        def occ_ribbon():
+            summary_df = all_occ_summary()
+            if summary_df.is_empty():
+                return None
+            return build_occupation_ribbon(
+                summary_df.to_pandas(),
+                all_occ_ai().to_pandas(),
+                int(app_input.occ_year()),
+            )
+
         @render.ui
         def occ_value_boxes():
             summary = occ_summary()
@@ -139,7 +156,10 @@ with ui.navset_pill(id="main_tabs"):
                         @render.download(
                             filename="ai_exposure.png",
                             media_type="image/png",
-                            label=ui.span(fa.icon_svg("download"), title="Download as PNG"),
+                            label=ui.span(
+                                fa.icon_svg("download"),
+                                title="Download as PNG",
+                            ),
                         )
                         async def dl_ai_bar():
                             yield export_fig(
@@ -170,7 +190,10 @@ with ui.navset_pill(id="main_tabs"):
                         @render.download(
                             filename="monthly_employment_count.png",
                             media_type="image/png",
-                            label=ui.span(fa.icon_svg("download"), title="Download as PNG"),
+                            label=ui.span(
+                                fa.icon_svg("download"),
+                                title="Download as PNG",
+                            ),
                         )
                         async def dl_occ_employment_count():
                             yield export_fig(
@@ -196,7 +219,10 @@ with ui.navset_pill(id="main_tabs"):
                         @render.download(
                             filename="monthly_employment.png",
                             media_type="image/png",
-                            label=ui.span(fa.icon_svg("download"), title="Download as PNG"),
+                            label=ui.span(
+                                fa.icon_svg("download"),
+                                title="Download as PNG",
+                            ),
                         )
                         async def dl_occ_employment():
                             yield export_fig(
@@ -229,7 +255,7 @@ with ui.navset_pill(id="main_tabs"):
             )
             ui.input_select(
                 "comp_year",
-                "AI exposure year",
+                "Year",
                 choices={str(y): str(y) for y in YEARS},
                 selected=str(YEAR_MAX),
             )
@@ -397,6 +423,16 @@ with ui.navset_pill(id="main_tabs"):
 @reactive.calc
 def occ_summary():
     return get_occ_summary(lf, app_input.occ_occupation(), int(app_input.occ_year()))
+
+
+@reactive.calc
+def all_occ_summary():
+    return get_all_occ_summary(lf, int(app_input.occ_year()))
+
+
+@reactive.calc
+def all_occ_ai():
+    return get_all_occ_ai_exposure(lf, int(app_input.occ_year()))
 
 
 @reactive.calc
