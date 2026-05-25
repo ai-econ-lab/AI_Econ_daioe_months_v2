@@ -54,6 +54,7 @@ def build_value_boxes(summary: dict, occupation: str) -> ui.Tag:
 
     emp = summary["employment"]
     pct1 = summary["pct_1m"]
+    pct3 = summary["pct_3m"]
     year = summary["year"]
     month = summary.get("month", str(year))
 
@@ -61,7 +62,7 @@ def build_value_boxes(summary: dict, occupation: str) -> ui.Tag:
         ui.h6(f"National Employment of {occupation}", class_="mt-3 mb-2 fw-semibold"),
         ui.layout_columns(
             ui.value_box(
-                title="Employment Count",
+                title="Employment Count (000s)",
                 showcase=fa.icon_svg("users"),
                 value=f"{emp:,.0f}",
                 theme="primary",
@@ -76,7 +77,17 @@ def build_value_boxes(summary: dict, occupation: str) -> ui.Tag:
                 ),
                 theme=_fmt_theme(pct1),
             ),
-            col_widths=[6, 6],
+            ui.value_box(
+                title="3-month change",
+                value=_fmt_pct(pct3),
+                showcase=fa.icon_svg(
+                    "arrow-trend-up"
+                    if pct3 is None or pct3 >= 0
+                    else "arrow-trend-down",
+                ),
+                theme=_fmt_theme(pct3),
+            ),
+            col_widths=[4, 4, 4],
         ),
         ui.markdown(f"Employment count as at **{month}**.\n\n{SCB_SOURCE_MD}"),
     )
