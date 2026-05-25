@@ -22,6 +22,7 @@ _C_TITLE = "#0C0A3E"
 _FONT_BASE = "Nunito Sans"
 _FONT_HEAD = "Montserrat"
 
+
 def _nullify(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
     """Replace NaN with Python None in specified columns so Plotly serialises them as JSON null."""
     for col in cols:
@@ -67,10 +68,13 @@ def build_value_boxes(summary: dict, occupation: str) -> ui.Tag:
     month = summary.get("month", str(year))
 
     return ui.div(
-        ui.h6(f"National Employment of {occupation}", class_="mt-3 mb-2 fw-semibold"),
+        ui.h6(
+            f"National Employment of {occupation} (All Sexes)",
+            class_="mt-3 mb-2 fw-semibold",
+        ),
         ui.layout_columns(
             ui.value_box(
-                title="Employment Count (000s)",
+                title="Employment (thousands)",
                 showcase=fa.icon_svg("users"),
                 value=f"{emp:,.0f}",
                 theme="primary",
@@ -101,50 +105,158 @@ def build_value_boxes(summary: dict, occupation: str) -> ui.Tag:
     )
 
 
+def _ticker_chip(label: str, value: str, tone: str = "neutral") -> ui.Tag:
+    return ui.span(
+        ui.span(label, class_="ticker-label"),
+        ui.span(value, class_="ticker-value"),
+        class_=f"ticker-chip ticker-chip-{tone}",
+    )
+
+
+def _ticker_pct_tone(v: float | None) -> str:
+    if v is None or pd.isna(v):
+        return "neutral"
+    return "up" if v >= 0 else "down"
+
+
+def _ticker_fmt_pct(v: float | None) -> str:
+    if v is None or pd.isna(v):
+        return "N/A"
+    sign = "+" if v > 0 else ""
+    return f"{sign}{v:.1f}%"
+
+
+def _ticker_fmt_percentile(v: float | None) -> str:
+    if v is None or pd.isna(v):
+        return "N/A"
+    return f"{v:,.0f}th percentile"
+
+
+def _occ_chips(
+    row: pd.Series,
+    ai_rows: pd.DataFrame,
+    year: int,
+) -> list[ui.Tag]:
+    """Build the chip list for one occupation row."""
+    occ = row["occupation"]
+    emp = row["emp_count"]
+    emp_str = (
+        f"{round(emp * 1_000):,}" if emp is not None and not pd.isna(emp) else "N/A"
+    )
+
+    chips: list[ui.Tag] = [
+        _ticker_chip("Occupation", occ),
+        _ticker_chip("Employment (people)", emp_str),
+        _ticker_chip(
+            "1-month change",
+            _ticker_fmt_pct(row["pct_chg_1m"]),
+            _ticker_pct_tone(row["pct_chg_1m"]),
+        ),
+        _ticker_chip(
+            "3-month change",
+            _ticker_fmt_pct(row["pct_chg_3m"]),
+            _ticker_pct_tone(row["pct_chg_3m"]),
+        ),
+        _ticker_chip("Year", str(year)),
+    ]
+    for _, ai_row in ai_rows.iterrows():
+        chips.append(
+            _ticker_chip(
+                str(ai_row["domain"]),
+                _ticker_fmt_percentile(ai_row["percentile"]),
+            ),
+        )
+    return chips
+
+
+def build_occupation_ribbon(
+    summary_df: pd.DataFrame,
+    ai_df: pd.DataFrame,
+    year: int,
+) -> ui.Tag:
+    """
+    Build a continuously scrolling ribbon showing all occupations.
+
+    summary_df: columns occupation, emp_count, pct_chg_1m, pct_chg_3m (one row per occ).
+    ai_df: columns occupation, domain, percentile (long format, sorted by percentile desc).
+    """
+    ai_by_occ: dict[str, pd.DataFrame] = (
+        {occ: grp for occ, grp in ai_df.groupby("occupation", sort=False)}  # noqa: C416
+        if not ai_df.empty
+        else {}
+    )
+
+    sep = ui.span("·", class_="ticker-sep")
+    items: list[ui.Tag] = []
+    for _, row in summary_df.iterrows():
+        if items:
+            items.append(sep)
+        items.extend(
+            _occ_chips(row, ai_by_occ.get(row["occupation"], pd.DataFrame()), year),
+        )
+
+    if not items:
+        return ui.div()
+
+    content = ui.div(*items, class_="ticker-content")
+    duplicate = ui.div(*items, class_="ticker-content", aria_hidden="true")
+    return ui.div(
+        ui.div(content, duplicate, class_="ticker-track"),
+        class_="occupation-ticker",
+        role="region",
+        aria_label="All occupations ticker",
+    )
+
+
 def build_employment_count_chart(df: pd.DataFrame, occupation: str) -> go.Figure:
     """
     Build a Plotly line chart of total monthly employment count over time.
 
-    1-month % change is shown on hover. Returns an empty figure if df is empty.
+    1-month % change is shown on hover. When df contains multiple sex series,
+    each is drawn as a separate coloured line. Returns an empty figure if df is empty.
     """
     if df.empty:
         return go.Figure()
 
+    multi_sex = "sex" in df.columns and df["sex"].nunique() > 1  # noqa: PD101
+
     df = df.assign(
         emp_count=df["emp_count"].fillna(0),
-        pct_chg_1m_label=df["pct_chg_1m"].apply(
-            lambda v: f"{v:.1f}%" if pd.notna(v) else "N/A"
+        pct_chg_1m_label=df["pct_chg_1m"].map(
+            lambda v: f"{v:.1f}%" if pd.notna(v) else "N/A",
         ),
-    )
-    df = (
-        df.assign(_date=pd.to_datetime(df["month"], format="%Y-%b"))
-        .sort_values("_date")
-        .drop(columns=["_date"])
-    )
-
-    sorted_months = sorted(
-        df["month"].unique(),
-        key=lambda m: pd.to_datetime(m, format="%Y-%b"),
-    )
+        _date=pd.to_datetime(df["month"], format="%Y-%b"),
+    ).sort_values(["sex", "_date"] if multi_sex else "_date")
 
     fig = px.line(
         df,
-        x="month",
+        x="_date",
         y="emp_count",
+        color="sex" if multi_sex else None,
         markers=True,
-        custom_data=["pct_chg_1m_label"],
-        labels={
-            "month": "Month",
-            "emp_count": "Employment",
-        },
-        category_orders={"month": sorted_months},
+        custom_data=["pct_chg_1m_label", "month"],
+        labels={"_date": "Month", "emp_count": "Employment", "sex": "Sex"},
     )
     fig.update_traces(
+        line={"width": 3},
+        marker={"size": 8},
         hovertemplate=(
-            "Month: %{x}<br>"
+            "Month: %{customdata[1]}<br>"
             "Employment: %{y:,.0f}<br>"
             "1-mo Change: %{customdata[0]}<extra></extra>"
         ),
+    )
+    legend_cfg = (
+        {
+            "orientation": "h",
+            "yanchor": "bottom",
+            "y": -0.35,
+            "xanchor": "center",
+            "x": 0.5,
+            "title": None,
+        }
+        if multi_sex
+        else None
     )
     fig.update_layout(
         **_BASE_LAYOUT,
@@ -153,9 +265,16 @@ def build_employment_count_chart(df: pd.DataFrame, occupation: str) -> go.Figure
             "x": 0.01,
             "xanchor": "left",
         },
-        showlegend=False,
+        showlegend=multi_sex,
+        **({"legend": legend_cfg} if legend_cfg else {}),
     )
-    fig.update_xaxes(gridcolor=_C_GRID, zeroline=False, tickangle=-45)
+    fig.update_xaxes(
+        gridcolor=_C_GRID,
+        zeroline=False,
+        tickangle=-45,
+        tickformat="%b %Y",
+        dtick="M3",
+    )
     fig.update_yaxes(gridcolor=_C_GRID, zeroline=False)
     return fig
 
@@ -164,44 +283,53 @@ def build_employment_chart(df: pd.DataFrame, occupation: str) -> go.Figure:
     """
     Build a Plotly line chart of total 1-month employment % change over time.
 
-    Absolute employment count is shown on hover. Returns an empty figure if df is empty.
+    Absolute employment count is shown on hover. When df contains multiple sex
+    series, each is drawn as a separate coloured line. Returns an empty figure if
+    df is empty.
     """
     if df.empty:
         return go.Figure()
 
+    multi_sex = "sex" in df.columns and df["sex"].nunique() > 1  # noqa: PD101
+
     df = df.assign(emp_count=df["emp_count"].fillna(0))
     df = _nullify(df, ["pct_chg_1m"])
-    df = (
-        df.assign(_date=pd.to_datetime(df["month"], format="%Y-%b"))
-        .sort_values("_date")
-        .drop(columns=["_date"])
-    )
-
-    sorted_months = sorted(
-        df["month"].unique(),
-        key=lambda m: pd.to_datetime(m, format="%Y-%b"),
+    df = df.assign(_date=pd.to_datetime(df["month"], format="%Y-%b")).sort_values(
+        ["sex", "_date"] if multi_sex else "_date",
     )
 
     fig = px.line(
         df,
-        x="month",
+        x="_date",
         y="pct_chg_1m",
+        color="sex" if multi_sex else None,
         markers=True,
-        custom_data=["emp_count"],
-        labels={
-            "month": "Month",
-            "pct_chg_1m": "Employment change (%)",
-        },
-        category_orders={"month": sorted_months},
+        custom_data=["emp_count", "month"],
+        labels={"_date": "Month", "pct_chg_1m": "Employment change (%)", "sex": "Sex"},
     )
     fig.update_traces(
+        line={"width": 3},
+        marker={"size": 8},
         hovertemplate=(
-            "Month: %{x}<br>"
+            "Month: %{customdata[1]}<br>"
             "Change: %{y:.1f}%<br>"
             "Employment: %{customdata[0]:,.0f}<extra></extra>"
         ),
+        connectgaps=True,
     )
     fig.add_hline(y=0, line_color="grey", line_width=1)
+    legend_cfg = (
+        {
+            "orientation": "h",
+            "yanchor": "bottom",
+            "y": -0.35,
+            "xanchor": "center",
+            "x": 0.5,
+            "title": None,
+        }
+        if multi_sex
+        else None
+    )
     fig.update_layout(
         **_BASE_LAYOUT,
         title={
@@ -210,9 +338,16 @@ def build_employment_chart(df: pd.DataFrame, occupation: str) -> go.Figure:
             "xanchor": "left",
         },
         yaxis={"ticksuffix": "%"},
-        showlegend=False,
+        showlegend=multi_sex,
+        **({"legend": legend_cfg} if legend_cfg else {}),
     )
-    fig.update_xaxes(gridcolor=_C_GRID, zeroline=False, tickangle=-45)
+    fig.update_xaxes(
+        gridcolor=_C_GRID,
+        zeroline=False,
+        tickangle=-45,
+        tickformat="%b %Y",
+        dtick="M3",
+    )
     fig.update_yaxes(gridcolor=_C_GRID, zeroline=False)
     return fig
 
@@ -224,38 +359,38 @@ def build_comparison_employment_plot(df: pd.DataFrame) -> go.Figure:
 
     df = df.assign(emp_count=df["emp_count"].fillna(0))
     df = _nullify(df, ["pct_chg_1m"])
-    df = (
-        df.assign(_date=pd.to_datetime(df["month"], format="%Y-%b"))
-        .sort_values(["occupation", "_date"])
-        .drop(columns=["_date"])
-    )
-
-    sorted_months = sorted(
-        df["month"].unique(),
-        key=lambda m: pd.to_datetime(m, format="%Y-%b"),
+    df = df.assign(_date=pd.to_datetime(df["month"], format="%Y-%b")).sort_values(
+        ["occupation", "_date"],
     )
 
     fig = px.line(
         df,
-        x="month",
+        x="_date",
         y="pct_chg_1m",
         color="occupation",
         markers=True,
-        custom_data=["emp_count"],
-        labels={"pct_chg_1m": "Employment Change (%)", "month": "Month"},
-        category_orders={"month": sorted_months},
+        custom_data=["emp_count", "month"],
+        labels={"pct_chg_1m": "Employment Change (%)", "_date": "Month"},
     )
     fig.update_traces(
+        line={"width": 3},
+        marker={"size": 8},
         hovertemplate=(
             "<b>%{fullData.name}</b><br>"
-            "Month: %{x}<br>"
+            "Month: %{customdata[1]}<br>"
             "Change: %{y:.1f}%<br>"
             "Employment: %{customdata[0]:,.0f}<extra></extra>"
         ),
+        connectgaps=True,
     )
     fig.add_hline(y=0, line_color="grey", line_width=1)
     fig.update_layout(
         **_BASE_LAYOUT,
+        title={
+            "text": "Monthly Employment Change by Occupation in Sweden",
+            "x": 0.01,
+            "xanchor": "left",
+        },
         legend={
             "orientation": "h",
             "yanchor": "bottom",
@@ -266,7 +401,13 @@ def build_comparison_employment_plot(df: pd.DataFrame) -> go.Figure:
         },
         yaxis={"ticksuffix": "%"},
     )
-    fig.update_xaxes(gridcolor=_C_GRID, zeroline=False, tickangle=-45)
+    fig.update_xaxes(
+        gridcolor=_C_GRID,
+        zeroline=False,
+        tickangle=-45,
+        tickformat="%b %Y",
+        dtick="M3",
+    )
     fig.update_yaxes(gridcolor=_C_GRID, zeroline=False)
     return fig
 

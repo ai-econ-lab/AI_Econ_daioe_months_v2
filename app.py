@@ -8,6 +8,8 @@ from shiny.express import input as app_input
 from shinywidgets import render_widget
 
 from src.calcs import (
+    get_all_occ_ai_exposure,
+    get_all_occ_summary,
     get_comp_radar,
     get_comp_summary,
     get_comparison_employment,
@@ -16,7 +18,17 @@ from src.calcs import (
     get_occ_summary,
 )
 from src.constants import FIRST_COLS, METRICS
-from src.data import INTRO_MD, OCC_CHOICES, OCCS, YEAR_MAX, YEAR_MIN, YEARS, lf
+from src.data import (
+    ABOUT_MD,
+    INTRO_MD,
+    OCC_CHOICES,
+    OCCS,
+    SEXES,
+    YEAR_MAX,
+    YEAR_MIN,
+    YEARS,
+    lf,
+)
 from src.utils import (
     as_great_table_html,
     download_extension,
@@ -29,20 +41,24 @@ from src.visuals import (
     build_comparison_employment_plot,
     build_employment_chart,
     build_employment_count_chart,
+    build_occupation_ribbon,
     build_value_boxes,
     export_fig,
 )
 
 LOGOS_PATH = Path(__file__).parent / "logos"
-app_opts(static_assets={"/logos": LOGOS_PATH})
+CSS_PATH = Path(__file__).parent / "css"
+app_opts(static_assets={"/logos": LOGOS_PATH, "/css": CSS_PATH})
 
 ui.page_opts(
-    # title="AI Exposure & Monthly Employment Explorer",
     fillable=True,
     theme=ui.Theme.from_brand(__file__),
 )
 
+ui.tags.link(rel="stylesheet", href="/css/ticker.css")
+
 _DEFAULT_OCC = OCCS[0] if OCCS else None
+_SEX_CHOICES = {"All": "All", **{s: s.capitalize() for s in SEXES}}
 
 
 # ── Tab navigation ────────────────────────────────────────────
@@ -50,8 +66,8 @@ _DEFAULT_OCC = OCCS[0] if OCCS else None
 with ui.navset_pill(id="main_tabs"):
     # ── Tab 1: Occupation View ────────────────────────────────
 
-    with ui.nav_panel("Occupation View"), ui.layout_sidebar():
-        with ui.sidebar(title="Occupation View", width=280):
+    with ui.nav_panel("Single Occupation"), ui.layout_sidebar():
+        with ui.sidebar(title="Single Occupation", width=280):
             ui.div(
                 ui.img(
                     src="/logos/lab.svg",
@@ -67,25 +83,52 @@ with ui.navset_pill(id="main_tabs"):
                 "Occupation",
                 choices=OCC_CHOICES,
                 selected=_DEFAULT_OCC,
+                options={"placeholder": "Search occupation..."},
+            )
+            ui.p(
+                "SSYK 2012 major groups (9 categories).",
+                class_="text-muted small mt-n1 mb-2",
+            )
+            ui.input_selectize(
+                "occ_sex",
+                "Show sex lines",
+                choices={s: s.capitalize() for s in SEXES},
+                multiple=True,
+                options={"placeholder": "Select to overlay..."},
             )
             ui.input_select(
                 "occ_year",
-                "Year (snapshot)",
+                "Year",
                 choices={str(y): str(y) for y in YEARS},
                 selected=str(YEAR_MAX),
+            )
+            ui.p(
+                "Year for the AI exposure scores.",
+                class_="text-muted small mt-n1 mb-2",
             )
             ui.hr()
             ui.p("Employment trend filters:", class_="fw-semibold mb-1 small")
             ui.input_slider(
                 "occ_year_range",
-                "Year Range",
+                "Employment date range",
                 min=YEAR_MIN,
                 max=YEAR_MAX,
-                value=[YEAR_MIN, YEAR_MAX],
+                value=[max(YEAR_MIN, YEAR_MAX - 3), YEAR_MAX],
                 sep="",
             )
 
         # Value boxes
+        @render.ui
+        def occ_ribbon():
+            summary_df = all_occ_summary()
+            if summary_df.is_empty():
+                return None
+            return build_occupation_ribbon(
+                summary_df.to_pandas(),
+                all_occ_ai().to_pandas(),
+                int(app_input.occ_year()),
+            )
+
         @render.ui
         def occ_value_boxes():
             summary = occ_summary()
@@ -99,14 +142,49 @@ with ui.navset_pill(id="main_tabs"):
         # Stacked cards (full width)
         with ui.layout_columns(col_widths=12):
             with ui.card(full_screen=True, height="700px"):
-                with ui.card_header(class_="d-flex align-items-center"):
+                with ui.card_header(class_="d-flex align-items-center gap-2"):
+                    ui.span("Monthly Employment Change")
+                    with ui.popover(placement="bottom"):
+                        fa.icon_svg("circle-info", height="1.2em")
+                        "Month-to-month percentage change. Values above zero indicate growth; below zero indicate decline."
+                    with ui.span(class_="ms-auto"):
+
+                        @render.download(
+                            filename="monthly_employment.png",
+                            media_type="image/png",
+                            label=ui.span(
+                                fa.icon_svg("download"),
+                                title="Download as PNG",
+                            ),
+                        )
+                        async def dl_occ_employment():
+                            yield export_fig(
+                                build_employment_chart(
+                                    occ_employment().to_pandas(),
+                                    app_input.occ_occupation(),
+                                ),
+                            )
+
+                @render_widget
+                def occ_employment_chart():
+                    df = occ_employment().to_pandas()
+                    return build_employment_chart(df, app_input.occ_occupation())
+
+            with ui.card(full_screen=True, height="700px"):
+                with ui.card_header(class_="d-flex align-items-center gap-2"):
                     ui.span("AI Exposure by Sub-Domain")
+                    with ui.popover(placement="bottom"):
+                        fa.icon_svg("circle-info", height="1.2em")
+                        "Each bar shows how this occupation ranks against all others for that AI sub-domain. Higher percentile = higher relative AI exposure."
                     with ui.span(class_="ms-auto"):
 
                         @render.download(
                             filename="ai_exposure.png",
                             media_type="image/png",
-                            label=fa.icon_svg("download"),
+                            label=ui.span(
+                                fa.icon_svg("download"),
+                                title="Download as PNG",
+                            ),
                         )
                         async def dl_ai_bar():
                             yield export_fig(
@@ -127,14 +205,20 @@ with ui.navset_pill(id="main_tabs"):
                     )
 
             with ui.card(full_screen=True, height="700px"):
-                with ui.card_header(class_="d-flex align-items-center"):
-                    ui.span("Monthly Employment Count")
+                with ui.card_header(class_="d-flex align-items-center gap-2"):
+                    ui.span("Employment (thousands)")
+                    with ui.popover(placement="bottom"):
+                        fa.icon_svg("circle-info", height="1.2em")
+                        "Total national employment in thousands of people (all sexes combined). Use 'Show sex lines' to overlay per-sex trends."
                     with ui.span(class_="ms-auto"):
 
                         @render.download(
                             filename="monthly_employment_count.png",
                             media_type="image/png",
-                            label=fa.icon_svg("download"),
+                            label=ui.span(
+                                fa.icon_svg("download"),
+                                title="Download as PNG",
+                            ),
                         )
                         async def dl_occ_employment_count():
                             yield export_fig(
@@ -149,43 +233,31 @@ with ui.navset_pill(id="main_tabs"):
                     df = occ_employment().to_pandas()
                     return build_employment_count_chart(df, app_input.occ_occupation())
 
-            with ui.card(full_screen=True, height="700px"):
-                with ui.card_header(class_="d-flex align-items-center"):
-                    ui.span("Monthly Employment Change")
-                    with ui.span(class_="ms-auto"):
-
-                        @render.download(
-                            filename="monthly_employment.png",
-                            media_type="image/png",
-                            label=fa.icon_svg("download"),
-                        )
-                        async def dl_occ_employment():
-                            yield export_fig(
-                                build_employment_chart(
-                                    occ_employment().to_pandas(),
-                                    app_input.occ_occupation(),
-                                ),
-                            )
-
-                @render_widget
-                def occ_employment_chart():
-                    df = occ_employment().to_pandas()
-                    return build_employment_chart(df, app_input.occ_occupation())
-
     # ── Tab 2: Comparison View ────────────────────────────────
 
-    with ui.nav_panel("Comparison View"), ui.layout_sidebar():
-        with ui.sidebar(title="Comparison View", width=280):
+    with ui.nav_panel("Compare Occupations"), ui.layout_sidebar():
+        with ui.sidebar(title="Compare Occupations", width=280):
             ui.input_selectize(
                 "comp_occupations",
-                "Occupations (up to 5)",
+                "Occupations",
                 choices=OCC_CHOICES,
                 multiple=True,
-                options={"maxItems": 5, "placeholder": "Select occupations..."},
+                options={"maxItems": 5, "placeholder": "Search occupation..."},
+                selected=OCCS[:2],
+            )
+            ui.p(
+                "Select up to five occupations to compare.",
+                class_="text-muted small mt-n1 mb-2",
+            )
+            ui.input_select(
+                "comp_sex",
+                "Sex",
+                choices=_SEX_CHOICES,
+                selected="All",
             )
             ui.input_select(
                 "comp_year",
-                "Year (AI snapshot)",
+                "Year",
                 choices={str(y): str(y) for y in YEARS},
                 selected=str(YEAR_MAX),
             )
@@ -199,13 +271,14 @@ with ui.navset_pill(id="main_tabs"):
                 occs = list(app_input.comp_occupations() or [])
                 if not occs:
                     return ui.p(
-                        "Select at least one occupation.",
+                        "Select up to five occupations from the sidebar to compare employment changes and AI exposure scores.",
                         class_="text-muted p-3",
                     )
                 df = get_comp_summary(
                     lf,
                     occs,
                     int(app_input.comp_year()),
+                    app_input.comp_sex(),
                 ).to_pandas()
                 return ui.div(
                     as_great_table_html(df, METRICS),
@@ -214,14 +287,17 @@ with ui.navset_pill(id="main_tabs"):
 
         # AI percentile radar chart
         with ui.card(full_screen=True, height="700px"):
-            with ui.card_header(class_="d-flex align-items-center"):
-                ui.span("AI Percentile Radar Comparison")
+            with ui.card_header(class_="d-flex align-items-center gap-2"):
+                ui.span("AI Exposure Comparison (percentile rank)")
+                with ui.popover(placement="bottom"):
+                    fa.icon_svg("circle-info", height="1.2em")
+                    "Each axis shows a percentile rank (0-100). Outer position = higher relative AI exposure than other occupations."
                 with ui.span(class_="ms-auto"):
 
                     @render.download(
                         filename="ai_radar.png",
                         media_type="image/png",
-                        label=fa.icon_svg("download"),
+                        label=ui.span(fa.icon_svg("download"), title="Download as PNG"),
                     )
                     async def dl_comp_radar():
                         yield export_fig(
@@ -238,14 +314,17 @@ with ui.navset_pill(id="main_tabs"):
 
         # Employment comparison line chart
         with ui.card(full_screen=True, height="700px"):
-            with ui.card_header(class_="d-flex align-items-center"):
+            with ui.card_header(class_="d-flex align-items-center gap-2"):
                 ui.span("Monthly Employment Change")
+                with ui.popover(placement="bottom"):
+                    fa.icon_svg("circle-info", height="1.2em")
+                    "1-month percentage change in employment for each selected occupation."
                 with ui.span(class_="ms-auto"):
 
                     @render.download(
                         filename="comparison_employment.png",
                         media_type="image/png",
-                        label=fa.icon_svg("download"),
+                        label=ui.span(fa.icon_svg("download"), title="Download as PNG"),
                     )
                     async def dl_comp_employment():
                         yield export_fig(
@@ -261,7 +340,7 @@ with ui.navset_pill(id="main_tabs"):
 
     # ── Tab 3: Download ───────────────────────────────────────
 
-    with ui.nav_panel("Download"), ui.layout_sidebar():
+    with ui.nav_panel("Download Data"), ui.layout_sidebar():
         with ui.sidebar(title="Download Filters", width=280):
             ui.input_slider(
                 "dl_year_range",
@@ -273,9 +352,20 @@ with ui.navset_pill(id="main_tabs"):
             )
             ui.input_selectize(
                 "dl_occupations",
-                "Occupation (blank = all)",
+                "Occupations",
                 choices=OCC_CHOICES,
                 multiple=True,
+                options={"placeholder": "Leave empty to include all..."},
+            )
+            ui.p(
+                "Leave empty to include all occupations.",
+                class_="text-muted small mt-n1 mb-2",
+            )
+            ui.input_select(
+                "dl_sex",
+                "Sex",
+                choices=_SEX_CHOICES,
+                selected="All",
             )
             ui.input_select(
                 "dl_format",
@@ -295,7 +385,7 @@ with ui.navset_pill(id="main_tabs"):
                 yield export_filtered_data(df, app_input.dl_format())
 
         ui.p(
-            "Export the filtered row-level dataset or inspect a compact preview before downloading.",
+            "Export row-level monthly occupation data including employment counts, percentage changes, and AI exposure scores. Use the sidebar to filter by year and occupation.",
             class_="text-muted mb-3",
         )
 
@@ -329,13 +419,40 @@ with ui.navset_pill(id="main_tabs"):
                     METRICS,
                 )
 
+    # ── Tab 4: About ─────────────────────────────────────────
+
+    with ui.nav_panel("About"), ui.card(fill=True, fillable=True):
+        ui.card_header("About This Dashboard")
+        ui.div(
+            ui.img(
+                src="/logos/lab.svg",
+                alt="AI-Econ Lab logo",
+                style="height:60px; display:block; margin:1rem 0 1.5rem;",
+            ),
+        )
+        ui.markdown(ABOUT_MD)
+
 
 # ── Reactive calculations ─────────────────────────────────────
 
 
 @reactive.calc
 def occ_summary():
-    return get_occ_summary(lf, app_input.occ_occupation(), int(app_input.occ_year()))
+    return get_occ_summary(
+        lf,
+        app_input.occ_occupation(),
+        int(app_input.occ_year()),
+    )
+
+
+@reactive.calc
+def all_occ_summary():
+    return get_all_occ_summary(lf, int(app_input.occ_year()))
+
+
+@reactive.calc
+def all_occ_ai():
+    return get_all_occ_ai_exposure(lf, int(app_input.occ_year()))
 
 
 @reactive.calc
@@ -354,6 +471,7 @@ def occ_employment():
         lf,
         app_input.occ_occupation(),
         (yr[0], yr[1]),
+        tuple(app_input.occ_sex()),
     )
 
 
@@ -370,7 +488,7 @@ def comparison_data():
                 "pct_chg_1m": pl.Float64,
             },
         )
-    return get_comparison_employment(lf, occs)
+    return get_comparison_employment(lf, occs, app_input.comp_sex())
 
 
 @reactive.calc
@@ -389,4 +507,6 @@ def download_frame():
     )
     if app_input.dl_occupations():
         q = q.filter(pl.col("occupation").is_in(list(app_input.dl_occupations())))
+    if app_input.dl_sex() != "All":
+        q = q.filter(pl.col("sex") == app_input.dl_sex())
     return q.collect()
