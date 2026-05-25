@@ -206,10 +206,13 @@ def build_employment_count_chart(df: pd.DataFrame, occupation: str) -> go.Figure
     """
     Build a Plotly line chart of total monthly employment count over time.
 
-    1-month % change is shown on hover. Returns an empty figure if df is empty.
+    1-month % change is shown on hover. When df contains multiple sex series,
+    each is drawn as a separate coloured line. Returns an empty figure if df is empty.
     """
     if df.empty:
         return go.Figure()
+
+    multi_sex = "sex" in df.columns and df["sex"].nunique() > 1  # noqa: PD101
 
     df = df.assign(
         emp_count=df["emp_count"].fillna(0),
@@ -217,15 +220,16 @@ def build_employment_count_chart(df: pd.DataFrame, occupation: str) -> go.Figure
             lambda v: f"{v:.1f}%" if pd.notna(v) else "N/A",
         ),
         _date=pd.to_datetime(df["month"], format="%Y-%b"),
-    ).sort_values("_date")
+    ).sort_values(["sex", "_date"] if multi_sex else "_date")
 
     fig = px.line(
         df,
         x="_date",
         y="emp_count",
+        color="sex" if multi_sex else None,
         markers=True,
         custom_data=["pct_chg_1m_label", "month"],
-        labels={"_date": "Month", "emp_count": "Employment"},
+        labels={"_date": "Month", "emp_count": "Employment", "sex": "Sex"},
     )
     fig.update_traces(
         hovertemplate=(
@@ -234,6 +238,18 @@ def build_employment_count_chart(df: pd.DataFrame, occupation: str) -> go.Figure
             "1-mo Change: %{customdata[0]}<extra></extra>"
         ),
     )
+    legend_cfg = (
+        {
+            "orientation": "h",
+            "yanchor": "bottom",
+            "y": -0.35,
+            "xanchor": "center",
+            "x": 0.5,
+            "title": None,
+        }
+        if multi_sex
+        else None
+    )
     fig.update_layout(
         **_BASE_LAYOUT,
         title={
@@ -241,7 +257,8 @@ def build_employment_count_chart(df: pd.DataFrame, occupation: str) -> go.Figure
             "x": 0.01,
             "xanchor": "left",
         },
-        showlegend=False,
+        showlegend=multi_sex,
+        **({"legend": legend_cfg} if legend_cfg else {}),
     )
     fig.update_xaxes(
         gridcolor=_C_GRID,
@@ -258,24 +275,29 @@ def build_employment_chart(df: pd.DataFrame, occupation: str) -> go.Figure:
     """
     Build a Plotly line chart of total 1-month employment % change over time.
 
-    Absolute employment count is shown on hover. Returns an empty figure if df is empty.
+    Absolute employment count is shown on hover. When df contains multiple sex
+    series, each is drawn as a separate coloured line. Returns an empty figure if
+    df is empty.
     """
     if df.empty:
         return go.Figure()
 
+    multi_sex = "sex" in df.columns and df["sex"].nunique() > 1  # noqa: PD101
+
     df = df.assign(emp_count=df["emp_count"].fillna(0))
     df = _nullify(df, ["pct_chg_1m"])
     df = df.assign(_date=pd.to_datetime(df["month"], format="%Y-%b")).sort_values(
-        "_date",
+        ["sex", "_date"] if multi_sex else "_date",
     )
 
     fig = px.line(
         df,
         x="_date",
         y="pct_chg_1m",
+        color="sex" if multi_sex else None,
         markers=True,
         custom_data=["emp_count", "month"],
-        labels={"_date": "Month", "pct_chg_1m": "Employment change (%)"},
+        labels={"_date": "Month", "pct_chg_1m": "Employment change (%)", "sex": "Sex"},
     )
     fig.update_traces(
         hovertemplate=(
@@ -286,6 +308,18 @@ def build_employment_chart(df: pd.DataFrame, occupation: str) -> go.Figure:
         connectgaps=True,
     )
     fig.add_hline(y=0, line_color="grey", line_width=1)
+    legend_cfg = (
+        {
+            "orientation": "h",
+            "yanchor": "bottom",
+            "y": -0.35,
+            "xanchor": "center",
+            "x": 0.5,
+            "title": None,
+        }
+        if multi_sex
+        else None
+    )
     fig.update_layout(
         **_BASE_LAYOUT,
         title={
@@ -294,7 +328,8 @@ def build_employment_chart(df: pd.DataFrame, occupation: str) -> go.Figure:
             "xanchor": "left",
         },
         yaxis={"ticksuffix": "%"},
-        showlegend=False,
+        showlegend=multi_sex,
+        **({"legend": legend_cfg} if legend_cfg else {}),
     )
     fig.update_xaxes(
         gridcolor=_C_GRID,
