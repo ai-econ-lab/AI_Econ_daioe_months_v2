@@ -1,1 +1,1 @@
-This dashboard provides monthly employment data by occupation across SSYK Major Groups, and highlights the changes in employment for varied levels of AI exposure.
+Monthly employment trends for Swedish occupational major groups (SSYK 2012), sourced from SCB and enriched with DAIOE AI-exposure scores. Use **Single Occupation** to inspect one occupation, **Compare Occupations** to compare up to five, and **Download Data** to export the underlying data.
