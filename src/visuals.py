@@ -70,7 +70,7 @@ def build_value_boxes(summary: dict, occupation: str) -> ui.Tag:
         ui.h6(f"National Employment of {occupation}", class_="mt-3 mb-2 fw-semibold"),
         ui.layout_columns(
             ui.value_box(
-                title="Employment Count (000s)",
+                title="Employment (thousands)",
                 showcase=fa.icon_svg("users"),
                 value=f"{emp:,.0f}",
                 theme="primary",
@@ -113,35 +113,22 @@ def build_employment_count_chart(df: pd.DataFrame, occupation: str) -> go.Figure
     df = df.assign(
         emp_count=df["emp_count"].fillna(0),
         pct_chg_1m_label=df["pct_chg_1m"].apply(
-            lambda v: f"{v:.1f}%" if pd.notna(v) else "N/A"
+            lambda v: f"{v:.1f}%" if pd.notna(v) else "N/A",
         ),
-    )
-    df = (
-        df.assign(_date=pd.to_datetime(df["month"], format="%Y-%b"))
-        .sort_values("_date")
-        .drop(columns=["_date"])
-    )
-
-    sorted_months = sorted(
-        df["month"].unique(),
-        key=lambda m: pd.to_datetime(m, format="%Y-%b"),
-    )
+        _date=pd.to_datetime(df["month"], format="%Y-%b"),
+    ).sort_values("_date")
 
     fig = px.line(
         df,
-        x="month",
+        x="_date",
         y="emp_count",
         markers=True,
-        custom_data=["pct_chg_1m_label"],
-        labels={
-            "month": "Month",
-            "emp_count": "Employment",
-        },
-        category_orders={"month": sorted_months},
+        custom_data=["pct_chg_1m_label", "month"],
+        labels={"_date": "Month", "emp_count": "Employment"},
     )
     fig.update_traces(
         hovertemplate=(
-            "Month: %{x}<br>"
+            "Month: %{customdata[1]}<br>"
             "Employment: %{y:,.0f}<br>"
             "1-mo Change: %{customdata[0]}<extra></extra>"
         ),
@@ -155,7 +142,13 @@ def build_employment_count_chart(df: pd.DataFrame, occupation: str) -> go.Figure
         },
         showlegend=False,
     )
-    fig.update_xaxes(gridcolor=_C_GRID, zeroline=False, tickangle=-45)
+    fig.update_xaxes(
+        gridcolor=_C_GRID,
+        zeroline=False,
+        tickangle=-45,
+        tickformat="%b %Y",
+        dtick="M3",
+    )
     fig.update_yaxes(gridcolor=_C_GRID, zeroline=False)
     return fig
 
@@ -171,35 +164,23 @@ def build_employment_chart(df: pd.DataFrame, occupation: str) -> go.Figure:
 
     df = df.assign(emp_count=df["emp_count"].fillna(0))
     df = _nullify(df, ["pct_chg_1m"])
-    df = (
-        df.assign(_date=pd.to_datetime(df["month"], format="%Y-%b"))
-        .sort_values("_date")
-        .drop(columns=["_date"])
-    )
-
-    sorted_months = sorted(
-        df["month"].unique(),
-        key=lambda m: pd.to_datetime(m, format="%Y-%b"),
-    )
+    df = df.assign(_date=pd.to_datetime(df["month"], format="%Y-%b")).sort_values("_date")
 
     fig = px.line(
         df,
-        x="month",
+        x="_date",
         y="pct_chg_1m",
         markers=True,
-        custom_data=["emp_count"],
-        labels={
-            "month": "Month",
-            "pct_chg_1m": "Employment change (%)",
-        },
-        category_orders={"month": sorted_months},
+        custom_data=["emp_count", "month"],
+        labels={"_date": "Month", "pct_chg_1m": "Employment change (%)"},
     )
     fig.update_traces(
         hovertemplate=(
-            "Month: %{x}<br>"
+            "Month: %{customdata[1]}<br>"
             "Change: %{y:.1f}%<br>"
             "Employment: %{customdata[0]:,.0f}<extra></extra>"
         ),
+        connectgaps=True,
     )
     fig.add_hline(y=0, line_color="grey", line_width=1)
     fig.update_layout(
@@ -212,7 +193,13 @@ def build_employment_chart(df: pd.DataFrame, occupation: str) -> go.Figure:
         yaxis={"ticksuffix": "%"},
         showlegend=False,
     )
-    fig.update_xaxes(gridcolor=_C_GRID, zeroline=False, tickangle=-45)
+    fig.update_xaxes(
+        gridcolor=_C_GRID,
+        zeroline=False,
+        tickangle=-45,
+        tickformat="%b %Y",
+        dtick="M3",
+    )
     fig.update_yaxes(gridcolor=_C_GRID, zeroline=False)
     return fig
 
@@ -224,34 +211,27 @@ def build_comparison_employment_plot(df: pd.DataFrame) -> go.Figure:
 
     df = df.assign(emp_count=df["emp_count"].fillna(0))
     df = _nullify(df, ["pct_chg_1m"])
-    df = (
-        df.assign(_date=pd.to_datetime(df["month"], format="%Y-%b"))
-        .sort_values(["occupation", "_date"])
-        .drop(columns=["_date"])
-    )
-
-    sorted_months = sorted(
-        df["month"].unique(),
-        key=lambda m: pd.to_datetime(m, format="%Y-%b"),
+    df = df.assign(_date=pd.to_datetime(df["month"], format="%Y-%b")).sort_values(
+        ["occupation", "_date"],
     )
 
     fig = px.line(
         df,
-        x="month",
+        x="_date",
         y="pct_chg_1m",
         color="occupation",
         markers=True,
-        custom_data=["emp_count"],
-        labels={"pct_chg_1m": "Employment Change (%)", "month": "Month"},
-        category_orders={"month": sorted_months},
+        custom_data=["emp_count", "month"],
+        labels={"pct_chg_1m": "Employment Change (%)", "_date": "Month"},
     )
     fig.update_traces(
         hovertemplate=(
             "<b>%{fullData.name}</b><br>"
-            "Month: %{x}<br>"
+            "Month: %{customdata[1]}<br>"
             "Change: %{y:.1f}%<br>"
             "Employment: %{customdata[0]:,.0f}<extra></extra>"
         ),
+        connectgaps=True,
     )
     fig.add_hline(y=0, line_color="grey", line_width=1)
     fig.update_layout(
@@ -266,7 +246,13 @@ def build_comparison_employment_plot(df: pd.DataFrame) -> go.Figure:
         },
         yaxis={"ticksuffix": "%"},
     )
-    fig.update_xaxes(gridcolor=_C_GRID, zeroline=False, tickangle=-45)
+    fig.update_xaxes(
+        gridcolor=_C_GRID,
+        zeroline=False,
+        tickangle=-45,
+        tickformat="%b %Y",
+        dtick="M3",
+    )
     fig.update_yaxes(gridcolor=_C_GRID, zeroline=False)
     return fig
 
