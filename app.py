@@ -157,7 +157,7 @@ with ui.navset_pill(id="main_tabs"):
                                 title="Download as PNG",
                             ),
                         )
-                        async def dl_occ_employment():
+                        def dl_occ_employment():
                             yield export_fig(
                                 build_employment_chart(
                                     occ_employment().to_pandas(),
@@ -186,7 +186,7 @@ with ui.navset_pill(id="main_tabs"):
                                 title="Download as PNG",
                             ),
                         )
-                        async def dl_ai_bar():
+                        def dl_ai_bar():
                             yield export_fig(
                                 build_ai_exposure_bar(
                                     occ_ai_exposure().to_pandas(),
@@ -220,7 +220,7 @@ with ui.navset_pill(id="main_tabs"):
                                 title="Download as PNG",
                             ),
                         )
-                        async def dl_occ_employment_count():
+                        def dl_occ_employment_count():
                             yield export_fig(
                                 build_employment_count_chart(
                                     occ_employment().to_pandas(),
@@ -299,7 +299,7 @@ with ui.navset_pill(id="main_tabs"):
                         media_type="image/png",
                         label=ui.span(fa.icon_svg("download"), title="Download as PNG"),
                     )
-                    async def dl_comp_radar():
+                    def dl_comp_radar():
                         yield export_fig(
                             build_comp_radar_plot(
                                 comp_radar_data().to_pandas(),
@@ -326,7 +326,7 @@ with ui.navset_pill(id="main_tabs"):
                         media_type="image/png",
                         label=ui.span(fa.icon_svg("download"), title="Download as PNG"),
                     )
-                    async def dl_comp_employment():
+                    def dl_comp_employment():
                         yield export_fig(
                             build_comparison_employment_plot(
                                 comparison_data().to_pandas(),
@@ -380,7 +380,7 @@ with ui.navset_pill(id="main_tabs"):
                 ),
                 media_type=lambda: download_media_type(app_input.dl_format()),
             )
-            async def download_data():
+            def download_data():
                 df = download_frame().to_pandas()
                 yield export_filtered_data(df, app_input.dl_format())
 
