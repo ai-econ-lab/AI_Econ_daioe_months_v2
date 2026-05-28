@@ -6,7 +6,7 @@ This dashboard brings together monthly employment statistics from Statistics Swe
 
 | Source | Description |
 |---|---|
-| [Swedish Occupational Register, SCB](https://www.scb.se/en/finding-statistics/statistics-by-subject-area/labour-market/labour-force-supply/the-swedish-occupational-register-with-statistics/) | Monthly employment counts and changes by occupation and sex |
+| [Swedish Occupational Register, SCB](https://www.scb.se/en/finding-statistics/statistics-by-subject-area/labour-market/labour-force-supply/the-swedish-occupational-register-with-statistics/) | Monthly employment counts and changes by occupation and gender |
 | [DAIOE Framework](https://www.ai-econlab.com/ai-exposure-daioe) | Data-driven AI Occupational Exposure scores across multiple AI capability sub-domains |
 
 ---
@@ -35,7 +35,7 @@ Shows where an occupation sits relative to all others on a given sub-domain. A p
 An ordinal scale from 1 (Very Low) to 5 (Very High) summarising the weighted-average AI exposure score for a sub-domain. Used for quick comparisons; the underlying index score provides more precision.
 
 **Employment Change**
-Month-to-month or multi-month percentage change computed from absolute employment counts. Positive values indicate growth; negative values indicate decline. Changes are computed from aggregated employment counts and absolute changes, not by averaging sex-specific percentage rates.
+Month-to-month or multi-month percentage change computed from absolute employment counts. Positive values indicate growth; negative values indicate decline. Changes are computed from aggregated employment counts and absolute changes, not by averaging gender-specific percentage rates.
 
 ---
 
