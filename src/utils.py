@@ -112,7 +112,7 @@ def export_filtered_data(df: pd.DataFrame, fmt: str) -> str | bytes:
         elif importlib.util.find_spec("xlsxwriter") is not None:
             engine = "xlsxwriter"
         else:
-            raise RuntimeError("Excel export requires openpyxl or xlsxwriter.")
+            raise ModuleNotFoundError("Excel export requires openpyxl or xlsxwriter.")
 
         buffer = io.BytesIO()
         df.to_excel(buffer, index=False, engine=engine)
