@@ -20,10 +20,10 @@ from src.calcs import (
 from src.constants import FIRST_COLS, METRICS
 from src.data import (
     ABOUT_MD,
+    GENDERS,
     INTRO_MD,
     OCC_CHOICES,
     OCCS,
-    GENDERS,
     YEAR_MAX,
     YEAR_MIN,
     YEARS,
