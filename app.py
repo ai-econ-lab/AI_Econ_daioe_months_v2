@@ -116,6 +116,11 @@ with ui.navset_pill(id="main_tabs"):
                 value=[max(YEAR_MIN, YEAR_MAX - 3), YEAR_MAX],
                 sep="",
             )
+            ui.input_checkbox(
+                "occ_smooth",
+                "Apply 3-month moving average",
+                value=False,
+            )
 
         # Value boxes
         @render.ui
@@ -260,6 +265,13 @@ with ui.navset_pill(id="main_tabs"):
                 "Year",
                 choices={str(y): str(y) for y in YEARS},
                 selected=str(YEAR_MAX),
+            )
+            ui.hr()
+            ui.p("Trend filters:", class_="fw-semibold mb-1 small")
+            ui.input_checkbox(
+                "comp_smooth",
+                "Apply 3-month moving average",
+                value=False,
             )
 
         # Employment summary table
@@ -472,6 +484,7 @@ def occ_employment():
         app_input.occ_occupation(),
         (yr[0], yr[1]),
         tuple(app_input.occ_gender()),
+        smooth=app_input.occ_smooth(),
     )
 
 
@@ -488,7 +501,12 @@ def comparison_data():
                 "pct_chg_1m": pl.Float64,
             },
         )
-    return get_comparison_employment(lf, occs, app_input.comp_gender())
+    return get_comparison_employment(
+        lf,
+        occs,
+        app_input.comp_gender(),
+        smooth=app_input.comp_smooth(),
+    )
 
 
 @reactive.calc

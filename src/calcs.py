@@ -140,6 +140,8 @@ def get_occ_employment(
     occupation: str,
     year_range: tuple[int, int],
     extra_genders: tuple[str, ...] = (),
+    *,
+    smooth: bool = False,
 ) -> pl.DataFrame:
     """
     Return monthly employment data with optional per-gender breakdowns.
@@ -149,14 +151,10 @@ def get_occ_employment(
     Returns a DataFrame with columns: year, month, gender, emp_count, pct_chg_1m.
     """
     year_min, year_max = year_range
-    base = lf.filter(
-        (pl.col("occupation") == occupation)
-        & (pl.col("year") >= year_min)
-        & (pl.col("year") <= year_max),
-    )
+    base = lf.filter(pl.col("occupation") == occupation)
 
     def _monthly(lf_in: pl.LazyFrame, label: str) -> pl.DataFrame:
-        return (
+        q = (
             lf_in.group_by(["year", "month"])
             .agg(
                 [
@@ -172,6 +170,20 @@ def get_occ_employment(
                 ],
             )
             .sort("_date")
+        )
+        if smooth:
+            q = q.with_columns(
+                [
+                    pl.col("emp_count")
+                    .rolling_mean(window_size=3, min_periods=1)
+                    .alias("emp_count"),
+                    pl.col("pct_chg_1m")
+                    .rolling_mean(window_size=3, min_periods=1)
+                    .alias("pct_chg_1m"),
+                ],
+            )
+        return (
+            q.filter((pl.col("year") >= year_min) & (pl.col("year") <= year_max))
             .drop("_date")
             .collect()
         )
@@ -187,6 +199,8 @@ def get_comparison_employment(
     lf: pl.LazyFrame,
     occupations: list[str],
     gender: str = "All",
+    *,
+    smooth: bool = False,
 ) -> pl.DataFrame:
     """
     Return total employment and 1-month % change per year/month/occupation for the comparison view.
@@ -194,7 +208,7 @@ def get_comparison_employment(
     Aggregates across the selected gender (or all genders when gender='All').
     Returns a DataFrame with columns: year, month, occupation, emp_count, pct_chg_1m.
     """
-    return (
+    q = (
         _gender_filter(lf, gender)
         .filter(pl.col("occupation").is_in(occupations))
         .group_by(["year", "month", "occupation"])
@@ -211,9 +225,21 @@ def get_comparison_employment(
             ],
         )
         .sort(["occupation", "_date"])
-        .drop("_date")
-        .collect()
     )
+    if smooth:
+        q = q.with_columns(
+            [
+                pl.col("emp_count")
+                .rolling_mean(window_size=3, min_periods=1)
+                .over("occupation")
+                .alias("emp_count"),
+                pl.col("pct_chg_1m")
+                .rolling_mean(window_size=3, min_periods=1)
+                .over("occupation")
+                .alias("pct_chg_1m"),
+            ],
+        )
+    return q.drop("_date").collect()
 
 
 def get_comp_summary(
@@ -259,7 +285,9 @@ def get_comp_summary(
 
 
 def get_all_occ_summary(
-    lf: pl.LazyFrame, year: int, gender: str = "All"
+    lf: pl.LazyFrame,
+    year: int,
+    gender: str = "All",
 ) -> pl.DataFrame:
     """
     Return latest-month employment summary for every occupation in the given year.
