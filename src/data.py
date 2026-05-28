@@ -12,7 +12,7 @@ _ABOUT_TEMPLATE: str = (BASE_DIR / "md_files" / "about.md").read_text(encoding="
 
 DATA_PATH = BASE_DIR / "data" / "scb_months_lvl1.parquet"
 
-lf = pl.scan_parquet(DATA_PATH)
+lf = pl.scan_parquet(DATA_PATH).rename({"sex": "gender"})
 lf.collect_schema()
 
 OCCS: list[str] = (
@@ -21,8 +21,8 @@ OCCS: list[str] = (
 
 OCC_CHOICES: dict[str, str] = {o: o for o in OCCS}
 
-SEXES: list[str] = (
-    lf.select(pl.col("sex").unique().sort()).collect().to_series().to_list()
+GENDERS: list[str] = (
+    lf.select(pl.col("gender").unique().sort()).collect().to_series().to_list()
 )
 
 YEARS: list[int] = (

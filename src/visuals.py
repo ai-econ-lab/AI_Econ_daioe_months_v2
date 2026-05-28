@@ -212,13 +212,13 @@ def build_employment_count_chart(df: pd.DataFrame, occupation: str) -> go.Figure
     """
     Build a Plotly line chart of total monthly employment count over time.
 
-    1-month % change is shown on hover. When df contains multiple sex series,
+    1-month % change is shown on hover. When df contains multiple gender series,
     each is drawn as a separate coloured line. Returns an empty figure if df is empty.
     """
     if df.empty:
         return go.Figure()
 
-    multi_sex = "sex" in df.columns and df["sex"].nunique() > 1  # noqa: PD101
+    multi_gender = "gender" in df.columns and df["gender"].nunique() > 1  # noqa: PD101
 
     df = df.assign(
         emp_count=df["emp_count"].fillna(0),
@@ -226,16 +226,16 @@ def build_employment_count_chart(df: pd.DataFrame, occupation: str) -> go.Figure
             lambda v: f"{v:.1f}%" if pd.notna(v) else "N/A",
         ),
         _date=pd.to_datetime(df["month"], format="%Y-%b"),
-    ).sort_values(["sex", "_date"] if multi_sex else "_date")
+    ).sort_values(["gender", "_date"] if multi_gender else "_date")
 
     fig = px.line(
         df,
         x="_date",
         y="emp_count",
-        color="sex" if multi_sex else None,
+        color="gender" if multi_gender else None,
         markers=True,
         custom_data=["pct_chg_1m_label", "month"],
-        labels={"_date": "Month", "emp_count": "Employment", "sex": "Sex"},
+        labels={"_date": "Month", "emp_count": "Employment", "gender": "Gender"},
     )
     fig.update_traces(
         line={"width": 3},
@@ -255,7 +255,7 @@ def build_employment_count_chart(df: pd.DataFrame, occupation: str) -> go.Figure
             "x": 0.5,
             "title": None,
         }
-        if multi_sex
+        if multi_gender
         else None
     )
     fig.update_layout(
@@ -265,7 +265,7 @@ def build_employment_count_chart(df: pd.DataFrame, occupation: str) -> go.Figure
             "x": 0.01,
             "xanchor": "left",
         },
-        showlegend=multi_sex,
+        showlegend=multi_gender,
         **({"legend": legend_cfg} if legend_cfg else {}),
     )
     fig.update_xaxes(
@@ -283,29 +283,29 @@ def build_employment_chart(df: pd.DataFrame, occupation: str) -> go.Figure:
     """
     Build a Plotly line chart of total 1-month employment % change over time.
 
-    Absolute employment count is shown on hover. When df contains multiple sex
+    Absolute employment count is shown on hover. When df contains multiple gender
     series, each is drawn as a separate coloured line. Returns an empty figure if
     df is empty.
     """
     if df.empty:
         return go.Figure()
 
-    multi_sex = "sex" in df.columns and df["sex"].nunique() > 1  # noqa: PD101
+    multi_gender = "gender" in df.columns and df["gender"].nunique() > 1  # noqa: PD101
 
     df = df.assign(emp_count=df["emp_count"].fillna(0))
     df = _nullify(df, ["pct_chg_1m"])
     df = df.assign(_date=pd.to_datetime(df["month"], format="%Y-%b")).sort_values(
-        ["sex", "_date"] if multi_sex else "_date",
+        ["gender", "_date"] if multi_gender else "_date",
     )
 
     fig = px.line(
         df,
         x="_date",
         y="pct_chg_1m",
-        color="sex" if multi_sex else None,
+        color="gender" if multi_gender else None,
         markers=True,
         custom_data=["emp_count", "month"],
-        labels={"_date": "Month", "pct_chg_1m": "Employment change (%)", "sex": "Sex"},
+        labels={"_date": "Month", "pct_chg_1m": "Employment change (%)", "gender": "Gender"},
     )
     fig.update_traces(
         line={"width": 3},
@@ -327,7 +327,7 @@ def build_employment_chart(df: pd.DataFrame, occupation: str) -> go.Figure:
             "x": 0.5,
             "title": None,
         }
-        if multi_sex
+        if multi_gender
         else None
     )
     fig.update_layout(
@@ -338,7 +338,7 @@ def build_employment_chart(df: pd.DataFrame, occupation: str) -> go.Figure:
             "xanchor": "left",
         },
         yaxis={"ticksuffix": "%"},
-        showlegend=multi_sex,
+        showlegend=multi_gender,
         **({"legend": legend_cfg} if legend_cfg else {}),
     )
     fig.update_xaxes(
