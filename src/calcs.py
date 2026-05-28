@@ -175,10 +175,10 @@ def get_occ_employment(
             q = q.with_columns(
                 [
                     pl.col("emp_count")
-                    .rolling_mean(window_size=3, min_periods=1)
+                    .rolling_mean(window_size=3, min_samples=1)
                     .alias("emp_count"),
                     pl.col("pct_chg_1m")
-                    .rolling_mean(window_size=3, min_periods=1)
+                    .rolling_mean(window_size=3, min_samples=1)
                     .alias("pct_chg_1m"),
                 ],
             )
@@ -230,11 +230,11 @@ def get_comparison_employment(
         q = q.with_columns(
             [
                 pl.col("emp_count")
-                .rolling_mean(window_size=3, min_periods=1)
+                .rolling_mean(window_size=3, min_samples=1)
                 .over("occupation")
                 .alias("emp_count"),
                 pl.col("pct_chg_1m")
-                .rolling_mean(window_size=3, min_periods=1)
+                .rolling_mean(window_size=3, min_samples=1)
                 .over("occupation")
                 .alias("pct_chg_1m"),
             ],
