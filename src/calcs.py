@@ -258,7 +258,9 @@ def get_comp_summary(
     )
 
 
-def get_all_occ_summary(lf: pl.LazyFrame, year: int, gender: str = "All") -> pl.DataFrame:
+def get_all_occ_summary(
+    lf: pl.LazyFrame, year: int, gender: str = "All"
+) -> pl.DataFrame:
     """
     Return latest-month employment summary for every occupation in the given year.
 

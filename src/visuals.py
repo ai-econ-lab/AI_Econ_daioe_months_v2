@@ -305,7 +305,11 @@ def build_employment_chart(df: pd.DataFrame, occupation: str) -> go.Figure:
         color="gender" if multi_gender else None,
         markers=True,
         custom_data=["emp_count", "month"],
-        labels={"_date": "Month", "pct_chg_1m": "Employment change (%)", "gender": "Gender"},
+        labels={
+            "_date": "Month",
+            "pct_chg_1m": "Employment change (%)",
+            "gender": "Gender",
+        },
     )
     fig.update_traces(
         line={"width": 3},
