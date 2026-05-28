@@ -38,6 +38,7 @@ from src.utils import (
 from src.visuals import (
     build_ai_exposure_bar,
     build_comp_radar_plot,
+    build_comparison_employment_count_plot,
     build_comparison_employment_plot,
     build_employment_chart,
     build_employment_count_chart,
@@ -167,13 +168,18 @@ with ui.navset_pill(id="main_tabs"):
                                 build_employment_chart(
                                     occ_employment().to_pandas(),
                                     app_input.occ_occupation(),
+                                    smooth=app_input.occ_smooth(),
                                 ),
                             )
 
                 @render_widget
                 def occ_employment_chart():
                     df = occ_employment().to_pandas()
-                    return build_employment_chart(df, app_input.occ_occupation())
+                    return build_employment_chart(
+                        df,
+                        app_input.occ_occupation(),
+                        smooth=app_input.occ_smooth(),
+                    )
 
             with ui.card(full_screen=True, height="700px"):
                 with ui.card_header(class_="d-flex align-items-center gap-2"):
@@ -230,13 +236,18 @@ with ui.navset_pill(id="main_tabs"):
                                 build_employment_count_chart(
                                     occ_employment().to_pandas(),
                                     app_input.occ_occupation(),
+                                    smooth=app_input.occ_smooth(),
                                 ),
                             )
 
                 @render_widget
                 def occ_employment_count_chart():
                     df = occ_employment().to_pandas()
-                    return build_employment_count_chart(df, app_input.occ_occupation())
+                    return build_employment_count_chart(
+                        df,
+                        app_input.occ_occupation(),
+                        smooth=app_input.occ_smooth(),
+                    )
 
     # ── Tab 2: Comparison View ────────────────────────────────
 
@@ -268,6 +279,14 @@ with ui.navset_pill(id="main_tabs"):
             )
             ui.hr()
             ui.p("Trend filters:", class_="fw-semibold mb-1 small")
+            ui.input_slider(
+                "comp_year_range",
+                "Employment date range",
+                min=YEAR_MIN,
+                max=YEAR_MAX,
+                value=[max(YEAR_MIN, YEAR_MAX - 3), YEAR_MAX],
+                sep="",
+            )
             ui.input_checkbox(
                 "comp_smooth",
                 "Apply 3-month moving average",
@@ -342,13 +361,47 @@ with ui.navset_pill(id="main_tabs"):
                         yield export_fig(
                             build_comparison_employment_plot(
                                 comparison_data().to_pandas(),
+                                smooth=app_input.comp_smooth(),
                             ),
                         )
 
             @render_widget
             def comp_employment_chart():
                 df = comparison_data().to_pandas()
-                return build_comparison_employment_plot(df)
+                return build_comparison_employment_plot(
+                    df,
+                    smooth=app_input.comp_smooth(),
+                )
+
+        # Employment count comparison line chart
+        with ui.card(full_screen=True, height="700px"):
+            with ui.card_header(class_="d-flex align-items-center gap-2"):
+                ui.span("Employment (thousands)")
+                with ui.popover(placement="bottom"):
+                    fa.icon_svg("circle-info", height="1.2em")
+                    "Absolute monthly employment in thousands for each selected occupation."
+                with ui.span(class_="ms-auto"):
+
+                    @render.download(
+                        filename="comparison_employment_count.png",
+                        media_type="image/png",
+                        label=ui.span(fa.icon_svg("download"), title="Download as PNG"),
+                    )
+                    def dl_comp_employment_count():
+                        yield export_fig(
+                            build_comparison_employment_count_plot(
+                                comparison_data().to_pandas(),
+                                smooth=app_input.comp_smooth(),
+                            ),
+                        )
+
+            @render_widget
+            def comp_employment_count_chart():
+                df = comparison_data().to_pandas()
+                return build_comparison_employment_count_plot(
+                    df,
+                    smooth=app_input.comp_smooth(),
+                )
 
     # ── Tab 3: Download ───────────────────────────────────────
 
@@ -501,10 +554,12 @@ def comparison_data():
                 "pct_chg_1m": pl.Float64,
             },
         )
+    yr = app_input.comp_year_range()
     return get_comparison_employment(
         lf,
         occs,
         app_input.comp_gender(),
+        (yr[0], yr[1]),
         smooth=app_input.comp_smooth(),
     )
 

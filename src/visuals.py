@@ -208,7 +208,12 @@ def build_occupation_ribbon(
     )
 
 
-def build_employment_count_chart(df: pd.DataFrame, occupation: str) -> go.Figure:
+def build_employment_count_chart(
+    df: pd.DataFrame,
+    occupation: str,
+    *,
+    smooth: bool = False,
+) -> go.Figure:
     """
     Build a Plotly line chart of total monthly employment count over time.
 
@@ -258,10 +263,11 @@ def build_employment_count_chart(df: pd.DataFrame, occupation: str) -> go.Figure
         if multi_gender
         else None
     )
+    title_suffix = " (3-Month Moving Average)" if smooth else ""
     fig.update_layout(
         **_BASE_LAYOUT,
         title={
-            "text": f"Monthly Employment of {occupation} in Sweden",
+            "text": f"Monthly Employment of {occupation} in Sweden{title_suffix}",
             "x": 0.01,
             "xanchor": "left",
         },
@@ -279,7 +285,12 @@ def build_employment_count_chart(df: pd.DataFrame, occupation: str) -> go.Figure
     return fig
 
 
-def build_employment_chart(df: pd.DataFrame, occupation: str) -> go.Figure:
+def build_employment_chart(
+    df: pd.DataFrame,
+    occupation: str,
+    *,
+    smooth: bool = False,
+) -> go.Figure:
     """
     Build a Plotly line chart of total 1-month employment % change over time.
 
@@ -334,10 +345,11 @@ def build_employment_chart(df: pd.DataFrame, occupation: str) -> go.Figure:
         if multi_gender
         else None
     )
+    title_suffix = " (3-Month Moving Average)" if smooth else ""
     fig.update_layout(
         **_BASE_LAYOUT,
         title={
-            "text": f"Monthly Employment Change of {occupation} in Sweden",
+            "text": f"Monthly Employment Change of {occupation} in Sweden{title_suffix}",
             "x": 0.01,
             "xanchor": "left",
         },
@@ -356,7 +368,11 @@ def build_employment_chart(df: pd.DataFrame, occupation: str) -> go.Figure:
     return fig
 
 
-def build_comparison_employment_plot(df: pd.DataFrame) -> go.Figure:
+def build_comparison_employment_plot(
+    df: pd.DataFrame,
+    *,
+    smooth: bool = False,
+) -> go.Figure:
     """Build a line chart comparing 1-month employment % change across selected occupations."""
     if df.empty:
         return go.Figure()
@@ -388,10 +404,11 @@ def build_comparison_employment_plot(df: pd.DataFrame) -> go.Figure:
         connectgaps=True,
     )
     fig.add_hline(y=0, line_color="grey", line_width=1)
+    title_suffix = " (3-Month Moving Average)" if smooth else ""
     fig.update_layout(
         **_BASE_LAYOUT,
         title={
-            "text": "Monthly Employment Change by Occupation in Sweden",
+            "text": f"Monthly Employment Change by Occupation in Sweden{title_suffix}",
             "x": 0.01,
             "xanchor": "left",
         },
@@ -404,6 +421,70 @@ def build_comparison_employment_plot(df: pd.DataFrame) -> go.Figure:
             "title": None,
         },
         yaxis={"ticksuffix": "%"},
+    )
+    fig.update_xaxes(
+        gridcolor=_C_GRID,
+        zeroline=False,
+        tickangle=-45,
+        tickformat="%b %Y",
+        dtick="M3",
+    )
+    fig.update_yaxes(gridcolor=_C_GRID, zeroline=False)
+    return fig
+
+
+def build_comparison_employment_count_plot(
+    df: pd.DataFrame,
+    *,
+    smooth: bool = False,
+) -> go.Figure:
+    """Build a line chart comparing absolute monthly employment counts across selected occupations."""
+    if df.empty:
+        return go.Figure()
+
+    df = df.assign(
+        emp_count=df["emp_count"].fillna(0),
+        pct_chg_1m_label=df["pct_chg_1m"].map(
+            lambda v: f"{v:.1f}%" if pd.notna(v) else "N/A",
+        ),
+        _date=pd.to_datetime(df["month"], format="%Y-%b"),
+    ).sort_values(["occupation", "_date"])
+
+    title_suffix = " (3-Month Moving Average)" if smooth else ""
+    fig = px.line(
+        df,
+        x="_date",
+        y="emp_count",
+        color="occupation",
+        markers=True,
+        custom_data=["pct_chg_1m_label", "month"],
+        labels={"emp_count": "Employment (thousands)", "_date": "Month"},
+    )
+    fig.update_traces(
+        line={"width": 3},
+        marker={"size": 8},
+        hovertemplate=(
+            "<b>%{fullData.name}</b><br>"
+            "Month: %{customdata[1]}<br>"
+            "Employment: %{y:,.0f}<br>"
+            "1-mo Change: %{customdata[0]}<extra></extra>"
+        ),
+    )
+    fig.update_layout(
+        **_BASE_LAYOUT,
+        title={
+            "text": f"Monthly Employment by Occupation in Sweden{title_suffix}",
+            "x": 0.01,
+            "xanchor": "left",
+        },
+        legend={
+            "orientation": "h",
+            "yanchor": "bottom",
+            "y": -0.35,
+            "xanchor": "center",
+            "x": 0.5,
+            "title": None,
+        },
     )
     fig.update_xaxes(
         gridcolor=_C_GRID,
