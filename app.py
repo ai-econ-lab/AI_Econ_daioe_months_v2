@@ -23,7 +23,7 @@ from src.data import (
     INTRO_MD,
     OCC_CHOICES,
     OCCS,
-    SEXES,
+    GENDERS,
     YEAR_MAX,
     YEAR_MIN,
     YEARS,
@@ -58,7 +58,7 @@ ui.page_opts(
 ui.tags.link(rel="stylesheet", href="/css/ticker.css")
 
 _DEFAULT_OCC = OCCS[0] if OCCS else None
-_SEX_CHOICES = {"All": "All", **{s: s.capitalize() for s in SEXES}}
+_GENDER_CHOICES = {"All": "All", **{s: s.capitalize() for s in GENDERS}}
 
 
 # ── Tab navigation ────────────────────────────────────────────
@@ -90,9 +90,9 @@ with ui.navset_pill(id="main_tabs"):
                 class_="text-muted small mt-n1 mb-2",
             )
             ui.input_selectize(
-                "occ_sex",
-                "Show sex lines",
-                choices={s: s.capitalize() for s in SEXES},
+                "occ_gender",
+                "Show gender lines",
+                choices={s: s.capitalize() for s in GENDERS},
                 multiple=True,
                 options={"placeholder": "Select to overlay..."},
             )
@@ -209,7 +209,7 @@ with ui.navset_pill(id="main_tabs"):
                     ui.span("Employment (thousands)")
                     with ui.popover(placement="bottom"):
                         fa.icon_svg("circle-info", height="1.2em")
-                        "Total national employment in thousands of people (all sexes combined). Use 'Show sex lines' to overlay per-sex trends."
+                        "Total national employment in thousands of people (all genders combined). Use 'Show gender lines' to overlay per-gender trends."
                     with ui.span(class_="ms-auto"):
 
                         @render.download(
@@ -250,9 +250,9 @@ with ui.navset_pill(id="main_tabs"):
                 class_="text-muted small mt-n1 mb-2",
             )
             ui.input_select(
-                "comp_sex",
-                "Sex",
-                choices=_SEX_CHOICES,
+                "comp_gender",
+                "Gender",
+                choices=_GENDER_CHOICES,
                 selected="All",
             )
             ui.input_select(
@@ -278,7 +278,7 @@ with ui.navset_pill(id="main_tabs"):
                     lf,
                     occs,
                     int(app_input.comp_year()),
-                    app_input.comp_sex(),
+                    app_input.comp_gender(),
                 ).to_pandas()
                 return ui.div(
                     as_great_table_html(df, METRICS),
@@ -362,9 +362,9 @@ with ui.navset_pill(id="main_tabs"):
                 class_="text-muted small mt-n1 mb-2",
             )
             ui.input_select(
-                "dl_sex",
-                "Sex",
-                choices=_SEX_CHOICES,
+                "dl_gender",
+                "Gender",
+                choices=_GENDER_CHOICES,
                 selected="All",
             )
             ui.input_select(
@@ -471,7 +471,7 @@ def occ_employment():
         lf,
         app_input.occ_occupation(),
         (yr[0], yr[1]),
-        tuple(app_input.occ_sex()),
+        tuple(app_input.occ_gender()),
     )
 
 
@@ -488,7 +488,7 @@ def comparison_data():
                 "pct_chg_1m": pl.Float64,
             },
         )
-    return get_comparison_employment(lf, occs, app_input.comp_sex())
+    return get_comparison_employment(lf, occs, app_input.comp_gender())
 
 
 @reactive.calc
@@ -507,6 +507,6 @@ def download_frame():
     )
     if app_input.dl_occupations():
         q = q.filter(pl.col("occupation").is_in(list(app_input.dl_occupations())))
-    if app_input.dl_sex() != "All":
-        q = q.filter(pl.col("sex") == app_input.dl_sex())
+    if app_input.dl_gender() != "All":
+        q = q.filter(pl.col("gender") == app_input.dl_gender())
     return q.collect()

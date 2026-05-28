@@ -22,7 +22,7 @@ def readable_column_name(col: str, metrics: dict[str, str]) -> str:
         "occupation": "Occupation",
         "year": "Year",
         "month": "Month",
-        "sex": "Sex",
+        "gender": "Gender",
         "emp_count": "Employment (thousands)",
         "weight_sum": "Weight Sum",
         "chg_1m": "Emp Change 1mo (thousands)",
