@@ -58,7 +58,7 @@ FIRST_COLS: list[str] = [
     "occupation",
     "year",
     "month",
-    "sex",
+    "gender",
     "emp_count",
     "weight_sum",
     "chg_1m",
