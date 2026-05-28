@@ -251,9 +251,7 @@ def get_comp_summary(
                 pl.col("month").str.strptime(pl.Date, "%Y-%b").alias("_month_date"),
             ],
         )
-        .sort(["occupation", "_month_date"], descending=[False, True])
-        .group_by("occupation")
-        .head(1)
+        .filter(pl.col("_month_date") == pl.col("_month_date").max().over("occupation"))
         .select(["occupation", "emp_count", "pct_chg_1m", "pct_chg_3m", "pct_chg_6m"])
         .sort("occupation")
         .collect()
@@ -285,9 +283,7 @@ def get_all_occ_summary(lf: pl.LazyFrame, year: int, sex: str = "All") -> pl.Dat
                 pl.col("month").str.strptime(pl.Date, "%Y-%b").alias("_month_date"),
             ],
         )
-        .sort(["occupation", "_month_date"], descending=[False, True])
-        .group_by("occupation")
-        .head(1)
+        .filter(pl.col("_month_date") == pl.col("_month_date").max().over("occupation"))
         .select(["occupation", "emp_count", "pct_chg_1m", "pct_chg_3m"])
         .sort("occupation")
         .collect()
