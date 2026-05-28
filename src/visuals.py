@@ -69,7 +69,7 @@ def build_value_boxes(summary: dict, occupation: str) -> ui.Tag:
 
     return ui.div(
         ui.h6(
-            f"National Employment of {occupation} (All Sexes)",
+            f"National Employment of {occupation} (All Genders)",
             class_="mt-3 mb-2 fw-semibold",
         ),
         ui.layout_columns(
