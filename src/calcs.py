@@ -199,6 +199,7 @@ def get_comparison_employment(
     lf: pl.LazyFrame,
     occupations: list[str],
     gender: str = "All",
+    year_range: tuple[int, int] | None = None,
     *,
     smooth: bool = False,
 ) -> pl.DataFrame:
@@ -206,6 +207,7 @@ def get_comparison_employment(
     Return total employment and 1-month % change per year/month/occupation for the comparison view.
 
     Aggregates across the selected gender (or all genders when gender='All').
+    When year_range is provided, the filter is applied after smoothing to preserve lookback context.
     Returns a DataFrame with columns: year, month, occupation, emp_count, pct_chg_1m.
     """
     q = (
@@ -238,6 +240,10 @@ def get_comparison_employment(
                 .over("occupation")
                 .alias("pct_chg_1m"),
             ],
+        )
+    if year_range is not None:
+        q = q.filter(
+            (pl.col("year") >= year_range[0]) & (pl.col("year") <= year_range[1]),
         )
     return q.drop("_date").collect()
 
