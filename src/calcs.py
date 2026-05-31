@@ -42,16 +42,16 @@ def get_occ_summary(
     occupation: str,
     year: int,
     gender: str = "All",
-) -> dict | None:
+) -> pl.DataFrame:
     """
     Return employment and percentage changes for the latest month of the given year.
 
     Sums emp_count and chg columns across genders per month, derives pct changes from
     aggregated totals, then picks the most recent month.
-    Returns a dict with keys: employment, pct_1m, pct_3m, year, month.
-    Returns None if no data matches the filters.
+    Returns a single-row DataFrame with columns: emp_count, pct_chg_1m, pct_chg_3m, year, month.
+    Returns an empty DataFrame if no data matches the filters.
     """
-    df = (
+    return (
         _gender_filter(lf, gender)
         .filter(
             (pl.col("occupation") == occupation) & (pl.col("year") == year),
@@ -74,22 +74,9 @@ def get_occ_summary(
         )
         .sort("_month_date", descending=True)
         .head(1)
-        .drop("_month_date")
+        .select(["emp_count", "pct_chg_1m", "pct_chg_3m", "year", "month"])
         .collect()
     )
-
-    if df.is_empty():
-        return None
-
-    row = df.row(0, named=True)
-
-    return {
-        "employment": row["emp_count"],
-        "pct_1m": row["pct_chg_1m"],
-        "pct_3m": row["pct_chg_3m"],
-        "year": int(row["year"]),
-        "month": str(row["month"]),
-    }
 
 
 def get_occ_ai_exposure(
