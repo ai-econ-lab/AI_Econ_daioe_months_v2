@@ -6,7 +6,7 @@ This dashboard brings together monthly employment statistics from Statistics Swe
 
 | Source | Description |
 |---|---|
-| [Swedish Occupational Register, SCB](https://www.scb.se/en/finding-statistics/statistics-by-subject-area/labour-market/labour-force-supply/the-swedish-occupational-register-with-statistics/) | Monthly employment counts and changes by occupation and gender |
+| [Labour Force Survey (AKU), SCB](https://www.statistikdatabasen.scb.se/pxweb/sv/ssd/START__AM__AM0401__AM0401I/NAKUSysselYrke2012M/) | Monthly employment counts and changes by occupation and gender |
 | [DAIOE Framework](https://www.ai-econlab.com/ai-exposure-daioe) | Data-driven AI Occupational Exposure scores across multiple AI capability sub-domains |
 
 ---
