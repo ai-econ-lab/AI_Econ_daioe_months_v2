@@ -1,3 +1,5 @@
+import copy
+
 import faicons as fa
 import pandas as pd
 import plotly.express as px
@@ -594,6 +596,7 @@ def build_ai_exposure_bar(
 
 def export_fig(fig: go.Figure, width: int = 1000, height: int = 650) -> bytes:
     """Return PNG bytes of a figure with a solid white background."""
+    fig = copy.deepcopy(fig)
     is_polar = any(getattr(t, "type", "") == "scatterpolar" for t in fig.data)
     fig.update_layout(paper_bgcolor="white", plot_bgcolor="white")
     if is_polar:
