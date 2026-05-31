@@ -4,6 +4,7 @@ import faicons as fa
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import polars as pl
 from shiny import ui
 
 SCB_SOURCE_MD = (
@@ -43,7 +44,28 @@ _BASE_LAYOUT: dict = {
 }
 
 
-def build_value_boxes(summary: dict, occupation: str) -> ui.Tag:
+def _apply_xaxes(fig: go.Figure) -> None:
+    fig.update_xaxes(
+        gridcolor=_C_GRID, zeroline=False, tickangle=-45, tickformat="%b %Y", dtick="M3"
+    )
+
+
+def _apply_yaxes(fig: go.Figure) -> None:
+    fig.update_yaxes(gridcolor=_C_GRID, zeroline=False)
+
+
+def _hlegend() -> dict:
+    return {
+        "orientation": "h",
+        "yanchor": "bottom",
+        "y": -0.35,
+        "xanchor": "center",
+        "x": 0.5,
+        "title": None,
+    }
+
+
+def build_value_boxes(summary: pl.DataFrame, occupation: str) -> ui.Tag:
     """
     Build the employment summary value boxes for a given occupation.
 
@@ -63,11 +85,11 @@ def build_value_boxes(summary: dict, occupation: str) -> ui.Tag:
     def _fmt_theme(v: float | None) -> str:
         return _theme(v) if v is not None else "secondary"
 
-    emp = summary["employment"]
-    pct1 = summary["pct_1m"]
-    pct3 = summary["pct_3m"]
-    year = summary["year"]
-    month = summary.get("month", str(year))
+    row = summary.row(0, named=True)
+    emp = row["emp_count"]
+    pct1 = row["pct_chg_1m"]
+    pct3 = row["pct_chg_3m"]
+    month = row["month"]
 
     return ui.div(
         ui.h6(
@@ -228,12 +250,12 @@ def build_employment_count_chart(
     multi_gender = "gender" in df.columns and df["gender"].nunique() > 1  # noqa: PD101
 
     df = df.assign(
-        emp_count=df["emp_count"].fillna(0),
         pct_chg_1m_label=df["pct_chg_1m"].map(
             lambda v: f"{v:.1f}%" if pd.notna(v) else "N/A",
         ),
         _date=pd.to_datetime(df["month"], format="%Y-%b"),
     ).sort_values(["gender", "_date"] if multi_gender else "_date")
+    df = _nullify(df, ["emp_count"])
 
     fig = px.line(
         df,
@@ -253,18 +275,6 @@ def build_employment_count_chart(
             "1-mo Change: %{customdata[0]}<extra></extra>"
         ),
     )
-    legend_cfg = (
-        {
-            "orientation": "h",
-            "yanchor": "bottom",
-            "y": -0.35,
-            "xanchor": "center",
-            "x": 0.5,
-            "title": None,
-        }
-        if multi_gender
-        else None
-    )
     title_suffix = " (3-Month Moving Average)" if smooth else ""
     fig.update_layout(
         **_BASE_LAYOUT,
@@ -274,16 +284,10 @@ def build_employment_count_chart(
             "xanchor": "left",
         },
         showlegend=multi_gender,
-        **({"legend": legend_cfg} if legend_cfg else {}),
+        **({"legend": _hlegend()} if multi_gender else {}),
     )
-    fig.update_xaxes(
-        gridcolor=_C_GRID,
-        zeroline=False,
-        tickangle=-45,
-        tickformat="%b %Y",
-        dtick="M3",
-    )
-    fig.update_yaxes(gridcolor=_C_GRID, zeroline=False)
+    _apply_xaxes(fig)
+    _apply_yaxes(fig)
     return fig
 
 
@@ -305,11 +309,13 @@ def build_employment_chart(
 
     multi_gender = "gender" in df.columns and df["gender"].nunique() > 1  # noqa: PD101
 
-    df = df.assign(emp_count=df["emp_count"].fillna(0))
     df = _nullify(df, ["pct_chg_1m"])
-    df = df.assign(_date=pd.to_datetime(df["month"], format="%Y-%b")).sort_values(
-        ["gender", "_date"] if multi_gender else "_date",
-    )
+    df = df.assign(
+        emp_count_label=df["emp_count"].map(
+            lambda v: f"{v:,.0f}" if pd.notna(v) else "N/A",
+        ),
+        _date=pd.to_datetime(df["month"], format="%Y-%b"),
+    ).sort_values(["gender", "_date"] if multi_gender else "_date")
 
     fig = px.line(
         df,
@@ -317,7 +323,7 @@ def build_employment_chart(
         y="pct_chg_1m",
         color="gender" if multi_gender else None,
         markers=True,
-        custom_data=["emp_count", "month"],
+        custom_data=["emp_count_label", "month"],
         labels={
             "_date": "Month",
             "pct_chg_1m": "Employment change (%)",
@@ -330,23 +336,11 @@ def build_employment_chart(
         hovertemplate=(
             "Month: %{customdata[1]}<br>"
             "Change: %{y:.1f}%<br>"
-            "Employment: %{customdata[0]:,.0f}<extra></extra>"
+            "Employment: %{customdata[0]}<extra></extra>"
         ),
         connectgaps=True,
     )
     fig.add_hline(y=0, line_color="grey", line_width=1)
-    legend_cfg = (
-        {
-            "orientation": "h",
-            "yanchor": "bottom",
-            "y": -0.35,
-            "xanchor": "center",
-            "x": 0.5,
-            "title": None,
-        }
-        if multi_gender
-        else None
-    )
     title_suffix = " (3-Month Moving Average)" if smooth else ""
     fig.update_layout(
         **_BASE_LAYOUT,
@@ -357,16 +351,10 @@ def build_employment_chart(
         },
         yaxis={"ticksuffix": "%"},
         showlegend=multi_gender,
-        **({"legend": legend_cfg} if legend_cfg else {}),
+        **({"legend": _hlegend()} if multi_gender else {}),
     )
-    fig.update_xaxes(
-        gridcolor=_C_GRID,
-        zeroline=False,
-        tickangle=-45,
-        tickformat="%b %Y",
-        dtick="M3",
-    )
-    fig.update_yaxes(gridcolor=_C_GRID, zeroline=False)
+    _apply_xaxes(fig)
+    _apply_yaxes(fig)
     return fig
 
 
@@ -379,11 +367,13 @@ def build_comparison_employment_plot(
     if df.empty:
         return go.Figure()
 
-    df = df.assign(emp_count=df["emp_count"].fillna(0))
     df = _nullify(df, ["pct_chg_1m"])
-    df = df.assign(_date=pd.to_datetime(df["month"], format="%Y-%b")).sort_values(
-        ["occupation", "_date"],
-    )
+    df = df.assign(
+        emp_count_label=df["emp_count"].map(
+            lambda v: f"{v:,.0f}" if pd.notna(v) else "N/A",
+        ),
+        _date=pd.to_datetime(df["month"], format="%Y-%b"),
+    ).sort_values(["occupation", "_date"])
 
     fig = px.line(
         df,
@@ -391,7 +381,7 @@ def build_comparison_employment_plot(
         y="pct_chg_1m",
         color="occupation",
         markers=True,
-        custom_data=["emp_count", "month"],
+        custom_data=["emp_count_label", "month"],
         labels={"pct_chg_1m": "Employment Change (%)", "_date": "Month"},
     )
     fig.update_traces(
@@ -401,7 +391,7 @@ def build_comparison_employment_plot(
             "<b>%{fullData.name}</b><br>"
             "Month: %{customdata[1]}<br>"
             "Change: %{y:.1f}%<br>"
-            "Employment: %{customdata[0]:,.0f}<extra></extra>"
+            "Employment: %{customdata[0]}<extra></extra>"
         ),
         connectgaps=True,
     )
@@ -414,24 +404,11 @@ def build_comparison_employment_plot(
             "x": 0.01,
             "xanchor": "left",
         },
-        legend={
-            "orientation": "h",
-            "yanchor": "bottom",
-            "y": -0.35,
-            "xanchor": "center",
-            "x": 0.5,
-            "title": None,
-        },
+        legend=_hlegend(),
         yaxis={"ticksuffix": "%"},
     )
-    fig.update_xaxes(
-        gridcolor=_C_GRID,
-        zeroline=False,
-        tickangle=-45,
-        tickformat="%b %Y",
-        dtick="M3",
-    )
-    fig.update_yaxes(gridcolor=_C_GRID, zeroline=False)
+    _apply_xaxes(fig)
+    _apply_yaxes(fig)
     return fig
 
 
@@ -445,12 +422,12 @@ def build_comparison_employment_count_plot(
         return go.Figure()
 
     df = df.assign(
-        emp_count=df["emp_count"].fillna(0),
         pct_chg_1m_label=df["pct_chg_1m"].map(
             lambda v: f"{v:.1f}%" if pd.notna(v) else "N/A",
         ),
         _date=pd.to_datetime(df["month"], format="%Y-%b"),
     ).sort_values(["occupation", "_date"])
+    df = _nullify(df, ["emp_count"])
 
     title_suffix = " (3-Month Moving Average)" if smooth else ""
     fig = px.line(
@@ -479,23 +456,10 @@ def build_comparison_employment_count_plot(
             "x": 0.01,
             "xanchor": "left",
         },
-        legend={
-            "orientation": "h",
-            "yanchor": "bottom",
-            "y": -0.35,
-            "xanchor": "center",
-            "x": 0.5,
-            "title": None,
-        },
+        legend=_hlegend(),
     )
-    fig.update_xaxes(
-        gridcolor=_C_GRID,
-        zeroline=False,
-        tickangle=-45,
-        tickformat="%b %Y",
-        dtick="M3",
-    )
-    fig.update_yaxes(gridcolor=_C_GRID, zeroline=False)
+    _apply_xaxes(fig)
+    _apply_yaxes(fig)
     return fig
 
 
@@ -504,7 +468,8 @@ def build_comp_radar_plot(df: pd.DataFrame, metrics: dict[str, str]) -> go.Figur
     if df.empty:
         return go.Figure()
 
-    df = df.fillna(0)
+    pctl_cols = [f"pctl_{k}_wavg" for k in metrics]
+    df = _nullify(df, pctl_cols)
 
     categories = list(metrics.values())
     fig = go.Figure()
@@ -553,7 +518,7 @@ def build_ai_exposure_bar(
     if df.empty:
         return go.Figure()
 
-    df = df.fillna({"score": 0.0, "level": 0, "percentile": 0.0})
+    df = _nullify(df, ["score", "level", "percentile"])
 
     fig = go.Figure(
         go.Bar(

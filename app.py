@@ -138,7 +138,7 @@ with ui.navset_pill(id="main_tabs"):
         @render.ui
         def occ_value_boxes():
             summary = occ_summary()
-            if summary is None:
+            if summary.is_empty():
                 return ui.p(
                     "No data for the selected occupation and year.",
                     class_="text-muted p-3",
@@ -299,20 +299,14 @@ with ui.navset_pill(id="main_tabs"):
 
             @render.ui
             def comp_summary_table():
-                occs = list(app_input.comp_occupations() or [])
-                if not occs:
+                df = comp_summary_data()
+                if df.is_empty():
                     return ui.p(
                         "Select up to five occupations from the sidebar to compare employment changes and AI exposure scores.",
                         class_="text-muted p-3",
                     )
-                df = get_comp_summary(
-                    lf,
-                    occs,
-                    int(app_input.comp_year()),
-                    app_input.comp_gender(),
-                ).to_pandas()
                 return ui.div(
-                    as_great_table_html(df, METRICS),
+                    as_great_table_html(df.to_pandas(), METRICS),
                     style="overflow: auto; width: 100%; height: 100%;",
                 )
 
@@ -542,18 +536,20 @@ def occ_employment():
 
 
 @reactive.calc
+def comp_summary_data():
+    occs = list(app_input.comp_occupations() or [])
+    if not occs:
+        return pl.DataFrame()
+    return get_comp_summary(
+        lf, occs, int(app_input.comp_year()), app_input.comp_gender()
+    )
+
+
+@reactive.calc
 def comparison_data():
     occs = list(app_input.comp_occupations() or [])
     if not occs:
-        return pl.DataFrame(
-            schema={
-                "year": pl.Int64,
-                "month": pl.String,
-                "occupation": pl.String,
-                "emp_count": pl.Float64,
-                "pct_chg_1m": pl.Float64,
-            },
-        )
+        return pl.DataFrame()
     yr = app_input.comp_year_range()
     return get_comparison_employment(
         lf,
