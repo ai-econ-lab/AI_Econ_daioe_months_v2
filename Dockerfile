@@ -1,17 +1,9 @@
 # ------------------------------- Builder Stage ------------------------------ #
 FROM python:3.14-bookworm AS builder
 
-RUN apt-get update && apt-get install --no-install-recommends -y \
-    build-essential curl ca-certificates \
-  && rm -rf /var/lib/apt/lists/*
+# Install uv — statically linked binary, no apt dependencies needed
+COPY --from=ghcr.io/astral-sh/uv:0.6 /uv /uvx /bin/
 
-# Install uv
-RUN curl -fsSL https://astral.sh/uv/install.sh -o /install.sh \
-  && chmod 755 /install.sh \
-  && /install.sh \
-  && rm -f /install.sh
-
-ENV PATH="/root/.local/bin:${PATH}"
 ENV UV_PROJECT_ENVIRONMENT=/app/.venv
 
 WORKDIR /app
@@ -41,6 +33,10 @@ COPY data ./data
 COPY logos ./logos
 COPY _brand.yml ./_brand.yml
 COPY README.md ./README.md
+
+# HF Spaces ignores health checks, but this matters if deployed elsewhere (Cloud Run, ECS, etc.)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:7860')"
 
 # Requirement for deployment at hf
 EXPOSE 7860
