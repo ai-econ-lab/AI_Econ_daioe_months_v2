@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import faicons as fa
+import kaleido
 import polars as pl
 from shiny import reactive, render
 from shiny.express import app_opts, ui
@@ -47,7 +48,6 @@ from src.visuals import (
     export_fig,
 )
 
-import kaleido
 kaleido.start_sync_server()
 
 LOGOS_PATH = Path(__file__).parent / "logos"
@@ -544,7 +544,10 @@ def comp_summary_data():
     if not occs:
         return pl.DataFrame()
     return get_comp_summary(
-        lf, occs, int(app_input.comp_year()), app_input.comp_gender()
+        lf,
+        occs,
+        int(app_input.comp_year()),
+        app_input.comp_gender(),
     )
 
 
