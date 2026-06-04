@@ -48,7 +48,7 @@ from src.visuals import (
     export_fig,
 )
 
-kaleido.start_sync_server()
+kaleido.start_sync_server(silence_warnings=True)
 
 LOGOS_PATH = Path(__file__).parent / "logos"
 CSS_PATH = Path(__file__).parent / "css"
