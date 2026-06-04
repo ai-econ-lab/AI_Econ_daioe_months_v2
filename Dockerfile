@@ -20,6 +20,11 @@ FROM python:3.14-slim-bookworm AS production
 
 WORKDIR /app
 
+# Install Chromium for kaleido PNG export (sandbox disabled by default in choreographer)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    chromium \
+    && rm -rf /var/lib/apt/lists/*
+
 # Environment set-up
 COPY --from=builder /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
