@@ -47,6 +47,9 @@ from src.visuals import (
     export_fig,
 )
 
+import kaleido
+kaleido.start_sync_server()
+
 LOGOS_PATH = Path(__file__).parent / "logos"
 CSS_PATH = Path(__file__).parent / "css"
 app_opts(static_assets={"/logos": LOGOS_PATH, "/css": CSS_PATH})
