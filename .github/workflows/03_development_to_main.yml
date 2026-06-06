@@ -53,7 +53,6 @@ jobs:
             "app.py"
             "_brand.yml"
             "logos/lab.svg"
-            "css/ticker.css"
             "data/scb_months_lvl1.parquet"
             "Dockerfile"
             ".dockerignore"
@@ -85,7 +84,6 @@ jobs:
             "app.py"
             "_brand.yml"
             "logos/lab.svg"
-            "css/ticker.css"
             "data/scb_months_lvl1.parquet"
             "Dockerfile"
             ".dockerignore"
@@ -126,7 +124,6 @@ jobs:
             app.py \
             _brand.yml \
             logos/lab.svg \
-            css/ticker.css \
             data/scb_months_lvl1.parquet \
             Dockerfile \
             .dockerignore \
