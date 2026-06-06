@@ -29,7 +29,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
 
-# Copy only what the app needs at runtime
+# Copy only what the app needs at runtime - removed the css
 COPY app.py ./app.py
 COPY src ./src
 COPY md_files ./md_files
