@@ -12,7 +12,11 @@ _ABOUT_TEMPLATE: str = (BASE_DIR / "md_files" / "about.md").read_text(encoding="
 
 DATA_PATH = BASE_DIR / "data" / "scb_months_lvl1.parquet"
 
-lf = pl.scan_parquet(DATA_PATH).rename({"sex": "gender"})
+lf = (
+    pl.scan_parquet(DATA_PATH)
+    .rename({"sex": "gender"})
+    .with_columns(pl.col("month").str.strptime(pl.Date, "%Y-%b").alias("month_date"))
+)
 lf.collect_schema()
 
 OCCS: list[str] = (
@@ -33,10 +37,7 @@ YEAR_MIN: int = min(YEARS)
 YEAR_MAX: int = max(YEARS)
 
 _months_sorted = (
-    lf.select(pl.col("month").unique())
-    .collect()
-    .with_columns(pl.col("month").str.strptime(pl.Date, "%Y-%b").alias("_date"))
-    .sort("_date")
+    lf.select(["month", "month_date"]).unique().sort("month_date").collect()
 )
 MONTH_EARLIEST: str = _months_sorted.head(1)["month"][0]
 MONTH_LATEST: str = _months_sorted.tail(1)["month"][0]

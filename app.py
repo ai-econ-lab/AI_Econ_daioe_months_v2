@@ -152,7 +152,7 @@ with ui.navset_pill(id="main_tabs"):
                         def dl_occ_employment():
                             yield export_fig(
                                 build_employment_chart(
-                                    occ_employment().to_pandas(),
+                                    occ_employment_pd(),
                                     app_input.occ_occupation(),
                                     smooth=app_input.occ_smooth(),
                                 ),
@@ -160,7 +160,7 @@ with ui.navset_pill(id="main_tabs"):
 
                 @render_widget
                 def occ_employment_chart():
-                    df = occ_employment().to_pandas()
+                    df = occ_employment_pd()
                     return build_employment_chart(
                         df,
                         app_input.occ_occupation(),
@@ -186,7 +186,7 @@ with ui.navset_pill(id="main_tabs"):
                         def dl_ai_bar():
                             yield export_fig(
                                 build_ai_exposure_bar(
-                                    occ_ai_exposure().to_pandas(),
+                                    occ_ai_exposure_pd(),
                                     app_input.occ_occupation(),
                                     int(app_input.occ_year()),
                                 ),
@@ -194,7 +194,7 @@ with ui.navset_pill(id="main_tabs"):
 
                 @render_widget
                 def occ_ai_bar():
-                    df = occ_ai_exposure().to_pandas()
+                    df = occ_ai_exposure_pd()
                     return build_ai_exposure_bar(
                         df,
                         app_input.occ_occupation(),
@@ -220,7 +220,7 @@ with ui.navset_pill(id="main_tabs"):
                         def dl_occ_employment_count():
                             yield export_fig(
                                 build_employment_count_chart(
-                                    occ_employment().to_pandas(),
+                                    occ_employment_pd(),
                                     app_input.occ_occupation(),
                                     smooth=app_input.occ_smooth(),
                                 ),
@@ -228,7 +228,7 @@ with ui.navset_pill(id="main_tabs"):
 
                 @render_widget
                 def occ_employment_count_chart():
-                    df = occ_employment().to_pandas()
+                    df = occ_employment_pd()
                     return build_employment_count_chart(
                         df,
                         app_input.occ_occupation(),
@@ -313,14 +313,14 @@ with ui.navset_pill(id="main_tabs"):
                     def dl_comp_radar():
                         yield export_fig(
                             build_comp_radar_plot(
-                                comp_radar_data().to_pandas(),
+                                comp_radar_data_pd(),
                                 METRICS,
                             ),
                         )
 
             @render_widget
             def comp_radar_chart():
-                df = comp_radar_data().to_pandas()
+                df = comp_radar_data_pd()
                 return build_comp_radar_plot(df, METRICS)
 
         # Employment comparison line chart
@@ -340,14 +340,14 @@ with ui.navset_pill(id="main_tabs"):
                     def dl_comp_employment():
                         yield export_fig(
                             build_comparison_employment_plot(
-                                comparison_data().to_pandas(),
+                                comparison_data_pd(),
                                 smooth=app_input.comp_smooth(),
                             ),
                         )
 
             @render_widget
             def comp_employment_chart():
-                df = comparison_data().to_pandas()
+                df = comparison_data_pd()
                 return build_comparison_employment_plot(
                     df,
                     smooth=app_input.comp_smooth(),
@@ -370,14 +370,14 @@ with ui.navset_pill(id="main_tabs"):
                     def dl_comp_employment_count():
                         yield export_fig(
                             build_comparison_employment_count_plot(
-                                comparison_data().to_pandas(),
+                                comparison_data_pd(),
                                 smooth=app_input.comp_smooth(),
                             ),
                         )
 
             @render_widget
             def comp_employment_count_chart():
-                df = comparison_data().to_pandas()
+                df = comparison_data_pd()
                 return build_comparison_employment_count_plot(
                     df,
                     smooth=app_input.comp_smooth(),
@@ -545,6 +545,26 @@ def comp_radar_data():
     if not occs:
         return pl.DataFrame()
     return get_comp_radar(lf, occs, int(app_input.comp_year()))
+
+
+@reactive.calc
+def occ_employment_pd():
+    return occ_employment().to_pandas()
+
+
+@reactive.calc
+def occ_ai_exposure_pd():
+    return occ_ai_exposure().to_pandas()
+
+
+@reactive.calc
+def comparison_data_pd():
+    return comparison_data().to_pandas()
+
+
+@reactive.calc
+def comp_radar_data_pd():
+    return comp_radar_data().to_pandas()
 
 
 @reactive.calc
