@@ -33,7 +33,6 @@ ENV PATH="/app/.venv/bin:$PATH"
 COPY app.py ./app.py
 COPY src ./src
 COPY md_files ./md_files
-COPY css ./css
 COPY data ./data
 COPY logos ./logos
 COPY _brand.yml ./_brand.yml
