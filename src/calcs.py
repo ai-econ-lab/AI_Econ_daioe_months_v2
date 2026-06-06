@@ -56,7 +56,7 @@ def get_occ_summary(
         .filter(
             (pl.col("occupation") == occupation) & (pl.col("year") == year),
         )
-        .group_by("month")
+        .group_by(["month", "month_date"])
         .agg(
             [
                 pl.col("emp_count").sum(),
@@ -69,10 +69,9 @@ def get_occ_summary(
             [
                 _safe_pct("chg_1m", "emp_count", "pct_chg_1m"),
                 _safe_pct("chg_3m", "emp_count", "pct_chg_3m"),
-                pl.col("month").str.strptime(pl.Date, "%Y-%b").alias("_month_date"),
             ],
         )
-        .sort("_month_date", descending=True)
+        .sort("month_date", descending=True)
         .head(1)
         .select(["emp_count", "pct_chg_1m", "pct_chg_3m", "year", "month"])
         .collect()
@@ -142,7 +141,7 @@ def get_occ_employment(
 
     def _monthly(lf_in: pl.LazyFrame, label: str) -> pl.DataFrame:
         q = (
-            lf_in.group_by(["year", "month"])
+            lf_in.group_by(["year", "month", "month_date"])
             .agg(
                 [
                     pl.col("emp_count").sum(),
@@ -152,11 +151,10 @@ def get_occ_employment(
             .with_columns(
                 [
                     _safe_pct("chg_1m", "emp_count", "pct_chg_1m"),
-                    pl.col("month").str.strptime(pl.Date, "%Y-%b").alias("_date"),
                     pl.lit(label).alias("gender"),
                 ],
             )
-            .sort("_date")
+            .sort("month_date")
         )
         if smooth:
             q = q.with_columns(
@@ -171,7 +169,7 @@ def get_occ_employment(
             )
         return (
             q.filter((pl.col("year") >= year_min) & (pl.col("year") <= year_max))
-            .drop("_date")
+            .drop("month_date")
             .collect()
         )
 
@@ -200,7 +198,7 @@ def get_comparison_employment(
     q = (
         _gender_filter(lf, gender)
         .filter(pl.col("occupation").is_in(occupations))
-        .group_by(["year", "month", "occupation"])
+        .group_by(["year", "month", "month_date", "occupation"])
         .agg(
             [
                 pl.col("emp_count").sum(),
@@ -210,10 +208,9 @@ def get_comparison_employment(
         .with_columns(
             [
                 _safe_pct("chg_1m", "emp_count", "pct_chg_1m"),
-                pl.col("month").str.strptime(pl.Date, "%Y-%b").alias("_date"),
             ],
         )
-        .sort(["occupation", "_date"])
+        .sort(["occupation", "month_date"])
     )
     if smooth:
         q = q.with_columns(
@@ -232,7 +229,7 @@ def get_comparison_employment(
         q = q.filter(
             (pl.col("year") >= year_range[0]) & (pl.col("year") <= year_range[1]),
         )
-    return q.drop("_date").collect()
+    return q.drop("month_date").collect()
 
 
 def get_comp_summary(
@@ -253,7 +250,7 @@ def get_comp_summary(
         .filter(
             pl.col("occupation").is_in(occupations) & (pl.col("year") == year),
         )
-        .group_by(["occupation", "month"])
+        .group_by(["occupation", "month", "month_date"])
         .agg(
             [
                 pl.col("emp_count").sum(),
@@ -267,10 +264,9 @@ def get_comp_summary(
                 _safe_pct("chg_1m", "emp_count", "pct_chg_1m"),
                 _safe_pct("chg_3m", "emp_count", "pct_chg_3m"),
                 _safe_pct("chg_6m", "emp_count", "pct_chg_6m"),
-                pl.col("month").str.strptime(pl.Date, "%Y-%b").alias("_month_date"),
             ],
         )
-        .filter(pl.col("_month_date") == pl.col("_month_date").max().over("occupation"))
+        .filter(pl.col("month_date") == pl.col("month_date").max().over("occupation"))
         .select(["occupation", "emp_count", "pct_chg_1m", "pct_chg_3m", "pct_chg_6m"])
         .sort("occupation")
         .collect()
