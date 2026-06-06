@@ -9,8 +9,6 @@ from shiny.express import input as app_input
 from shinywidgets import render_widget
 
 from src.calcs import (
-    get_all_occ_ai_exposure,
-    get_all_occ_summary,
     get_comp_radar,
     get_comp_summary,
     get_comparison_employment,
@@ -43,7 +41,6 @@ from src.visuals import (
     build_comparison_employment_plot,
     build_employment_chart,
     build_employment_count_chart,
-    build_occupation_ribbon,
     build_value_boxes,
     export_fig,
 )
@@ -51,15 +48,12 @@ from src.visuals import (
 kaleido.start_sync_server(silence_warnings=True)
 
 LOGOS_PATH = Path(__file__).parent / "logos"
-CSS_PATH = Path(__file__).parent / "css"
-app_opts(static_assets={"/logos": LOGOS_PATH, "/css": CSS_PATH})
+app_opts(static_assets={"/logos": LOGOS_PATH})
 
 ui.page_opts(
     fillable=True,
     theme=ui.Theme.from_brand(__file__),
 )
-
-ui.tags.link(rel="stylesheet", href="/css/ticker.css")
 
 _DEFAULT_OCC = OCCS[0] if OCCS else None
 _GENDER_CHOICES = {"All": "All", **{s: s.capitalize() for s in GENDERS}}
@@ -127,17 +121,6 @@ with ui.navset_pill(id="main_tabs"):
             )
 
         # Value boxes
-        @render.ui
-        def occ_ribbon():
-            summary_df = all_occ_summary()
-            if summary_df.is_empty():
-                return None
-            return build_occupation_ribbon(
-                summary_df.to_pandas(),
-                all_occ_ai().to_pandas(),
-                int(app_input.occ_year()),
-            )
-
         @render.ui
         def occ_value_boxes():
             summary = occ_summary()
@@ -505,16 +488,6 @@ def occ_summary():
         app_input.occ_occupation(),
         int(app_input.occ_year()),
     )
-
-
-@reactive.calc
-def all_occ_summary():
-    return get_all_occ_summary(lf, int(app_input.occ_year()))
-
-
-@reactive.calc
-def all_occ_ai():
-    return get_all_occ_ai_exposure(lf, int(app_input.occ_year()))
 
 
 @reactive.calc
