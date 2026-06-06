@@ -48,6 +48,22 @@ _BASE_LAYOUT: dict = {
 }
 
 
+def _empty_figure() -> go.Figure:
+    """Return a blank figure with a centered 'No data available' annotation."""
+    fig = go.Figure()
+    fig.add_annotation(
+        text="No data available",
+        showarrow=False,
+        font={"size": 16, "color": "#999"},
+        xref="paper",
+        yref="paper",
+        x=0.5,
+        y=0.5,
+    )
+    fig.update_layout(**_BASE_LAYOUT)
+    return fig
+
+
 def _apply_xaxes(fig: go.Figure) -> None:
     fig.update_xaxes(
         gridcolor=_C_GRID,
@@ -150,7 +166,7 @@ def build_employment_count_chart(
     each is drawn as a separate coloured line. Returns an empty figure if df is empty.
     """
     if df.empty:
-        return go.Figure()
+        return _empty_figure()
 
     multi_gender = "gender" in df.columns and df["gender"].nunique() > 1  # noqa: PD101
 
@@ -210,7 +226,7 @@ def build_employment_chart(
     df is empty.
     """
     if df.empty:
-        return go.Figure()
+        return _empty_figure()
 
     multi_gender = "gender" in df.columns and df["gender"].nunique() > 1  # noqa: PD101
 
@@ -270,7 +286,7 @@ def build_comparison_employment_plot(
 ) -> go.Figure:
     """Build a line chart comparing 1-month employment % change across selected occupations."""
     if df.empty:
-        return go.Figure()
+        return _empty_figure()
 
     df = _nullify(df, ["pct_chg_1m"])
     df = df.assign(
@@ -324,7 +340,7 @@ def build_comparison_employment_count_plot(
 ) -> go.Figure:
     """Build a line chart comparing absolute monthly employment counts across selected occupations."""
     if df.empty:
-        return go.Figure()
+        return _empty_figure()
 
     df = df.assign(
         pct_chg_1m_label=df["pct_chg_1m"].map(
@@ -371,7 +387,7 @@ def build_comparison_employment_count_plot(
 def build_comp_radar_plot(df: pd.DataFrame, metrics: dict[str, str]) -> go.Figure:
     """Build a radar chart comparing AI percentile scores across selected occupations."""
     if df.empty:
-        return go.Figure()
+        return _empty_figure()
 
     pctl_cols = [f"pctl_{k}_wavg" for k in metrics]
     df = _nullify(df, pctl_cols)
@@ -421,7 +437,7 @@ def build_ai_exposure_bar(
     Hover shows exposure level label, index score, and percentile rank.
     """
     if df.empty:
-        return go.Figure()
+        return _empty_figure()
 
     df = _nullify(df, ["score", "level", "percentile"])
 
