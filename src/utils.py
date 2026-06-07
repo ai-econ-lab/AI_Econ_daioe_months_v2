@@ -1,12 +1,16 @@
 """Download helpers, table rendering, and column label formatters."""
 
+from __future__ import annotations
+
 import importlib.util
 import io
 import re
+from typing import TYPE_CHECKING
 
-import pandas as pd
-from great_tables import GT
 from shiny import ui
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 
 def metric_display_name(metric_key: str, metrics: dict[str, str]) -> str:
@@ -57,6 +61,9 @@ def readable_column_name(col: str, metrics: dict[str, str]) -> str:
 
 def as_great_table_html(df: pd.DataFrame, metrics: dict[str, str]) -> ui.TagChild:
     """Render a pandas DataFrame as Great Tables HTML with readable headers."""
+    import pandas as pd
+    from great_tables import GT
+
     if df.empty:
         return ui.p("No data available for the selected filters.")
 
