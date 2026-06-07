@@ -127,7 +127,7 @@ def build_value_boxes(summary: pl.DataFrame, occupation: str) -> ui.Tag:
         ),
         ui.layout_columns(
             ui.value_box(
-                title="Employment (thousands)",
+                title="Employment ('000)",
                 showcase=fa.icon_svg("users"),
                 value=f"{emp:,.0f}",
                 theme="primary",
@@ -371,7 +371,7 @@ def build_comparison_employment_count_plot(
         color="occupation",
         markers=True,
         custom_data=["pct_chg_1m_label", "month"],
-        labels={"emp_count": "Employment (thousands)", "_date": "Month"},
+        labels={"emp_count": "Employment ('000)", "_date": "Month"},
     )
     fig.update_traces(
         line={"width": 3},
