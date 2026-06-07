@@ -17,6 +17,14 @@ dependencies = [
     "shinywidgets>=0.8.0",
 ]
 
+[tool.ruff.lint]
+ignore = [
+    "A004",    # Shiny Express intentionally shadows the `input` builtin
+    "SIM117",  # Shiny UI DSL requires nested `with` blocks; cannot be flattened
+    "PLC0415", # Deferred imports are intentional for performance (heavy dependencies)
+    "PLW0603", # Module-level flag for kaleido singleton is intentional
+]
+
 [tool.pyright]
 pythonVersion = "3.14"
 venvPath = "."
