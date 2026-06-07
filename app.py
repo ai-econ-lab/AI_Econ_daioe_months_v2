@@ -8,12 +8,10 @@ from shiny.express import input as app_input
 from shinywidgets import render_widget
 
 from src.calcs import (
-    get_comp_radar,
-    get_comp_summary,
+    get_comp_year_data,
     get_comparison_employment,
-    get_occ_ai_exposure,
+    get_occ_core,
     get_occ_employment,
-    get_occ_summary,
 )
 from src.constants import FIRST_COLS, METRICS
 from src.data import (
@@ -282,14 +280,14 @@ with ui.navset_pill(id="main_tabs"):
 
             @render.ui
             def comp_summary_table():
-                df = comp_summary_data()
-                if df.is_empty():
+                df = comp_summary_data_pd()
+                if df.empty:
                     return ui.p(
                         "Select up to five occupations from the sidebar to compare employment changes and AI exposure scores.",
                         class_="text-muted p-3",
                     )
                 return ui.div(
-                    as_great_table_html(df.to_pandas(), METRICS),
+                    as_great_table_html(df, METRICS),
                     style="overflow: auto; width: 100%; height: 100%;",
                 )
 
@@ -479,21 +477,19 @@ with ui.navset_pill(id="main_tabs"):
 
 
 @reactive.calc
+def occ_core():
+    """Run occ summary and AI exposure queries in parallel via collect_all."""
+    return get_occ_core(lf, app_input.occ_occupation(), int(app_input.occ_year()))
+
+
+@reactive.calc
 def occ_summary():
-    return get_occ_summary(
-        lf,
-        app_input.occ_occupation(),
-        int(app_input.occ_year()),
-    )
+    return occ_core()[0]
 
 
 @reactive.calc
 def occ_ai_exposure():
-    return get_occ_ai_exposure(
-        lf,
-        app_input.occ_occupation(),
-        int(app_input.occ_year()),
-    )
+    return occ_core()[1]
 
 
 @reactive.calc
@@ -509,16 +505,27 @@ def occ_employment():
 
 
 @reactive.calc
-def comp_summary_data():
+def comp_year_data():
+    """Run comp summary and radar queries in parallel via collect_all."""
     occs = list(app_input.comp_occupations() or [])
     if not occs:
-        return pl.DataFrame()
-    return get_comp_summary(
+        return pl.DataFrame(), pl.DataFrame()
+    return get_comp_year_data(
         lf,
         occs,
         int(app_input.comp_year()),
         app_input.comp_gender(),
     )
+
+
+@reactive.calc
+def comp_summary_data():
+    return comp_year_data()[0]
+
+
+@reactive.calc
+def comp_radar_data():
+    return comp_year_data()[1]
 
 
 @reactive.calc
@@ -537,14 +544,6 @@ def comparison_data():
 
 
 @reactive.calc
-def comp_radar_data():
-    occs = list(app_input.comp_occupations() or [])
-    if not occs:
-        return pl.DataFrame()
-    return get_comp_radar(lf, occs, int(app_input.comp_year()))
-
-
-@reactive.calc
 def occ_employment_pd():
     return occ_employment().to_pandas()
 
@@ -552,6 +551,11 @@ def occ_employment_pd():
 @reactive.calc
 def occ_ai_exposure_pd():
     return occ_ai_exposure().to_pandas()
+
+
+@reactive.calc
+def comp_summary_data_pd():
+    return comp_summary_data().to_pandas()
 
 
 @reactive.calc
