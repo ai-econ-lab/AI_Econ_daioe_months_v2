@@ -139,7 +139,7 @@ def get_occ_employment(
     year_min, year_max = year_range
     base = lf.filter(pl.col("occupation") == occupation)
 
-    def _monthly(lf_in: pl.LazyFrame, label: str) -> pl.DataFrame:
+    def _monthly_lf(lf_in: pl.LazyFrame, label: str) -> pl.LazyFrame:
         q = (
             lf_in.group_by(["year", "month", "month_date"])
             .agg(
@@ -167,16 +167,17 @@ def get_occ_employment(
                     .alias("pct_chg_1m"),
                 ],
             )
-        return (
-            q.filter((pl.col("year") >= year_min) & (pl.col("year") <= year_max))
-            .drop("month_date")
-            .collect()
+        return q.filter(
+            (pl.col("year") >= year_min) & (pl.col("year") <= year_max)
+        ).drop("month_date")
+
+    lazy_frames = [_monthly_lf(base, "All")]
+    for s in extra_genders:
+        lazy_frames.append(
+            _monthly_lf(base.filter(pl.col("gender") == s), s.capitalize())
         )
 
-    frames = [_monthly(base, "All")]
-    for s in extra_genders:
-        frames.append(_monthly(base.filter(pl.col("gender") == s), s.capitalize()))
-
+    frames = pl.collect_all(lazy_frames)
     return pl.concat(frames)
 
 
