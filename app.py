@@ -200,7 +200,7 @@ with ui.navset_pill(id="main_tabs"):
 
             with ui.card(full_screen=True, height="700px"):
                 with ui.card_header(class_="d-flex align-items-center gap-2"):
-                    ui.span("Employment (thousands)")
+                    ui.span("Employment ('000)")
                     with ui.popover(placement="bottom"):
                         fa.icon_svg("circle-info", height="1.2em")
                         "Total national employment in thousands of people (all genders combined). Use 'Show gender lines' to overlay per-gender trends."
@@ -353,7 +353,7 @@ with ui.navset_pill(id="main_tabs"):
         # Employment count comparison line chart
         with ui.card(full_screen=True, height="700px"):
             with ui.card_header(class_="d-flex align-items-center gap-2"):
-                ui.span("Employment (thousands)")
+                ui.span("Employment ('000)")
                 with ui.popover(placement="bottom"):
                     fa.icon_svg("circle-info", height="1.2em")
                     "Absolute monthly employment in thousands for each selected occupation."
