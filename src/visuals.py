@@ -1,13 +1,18 @@
+from __future__ import annotations
+
 import contextlib
 import copy
 import re
+from typing import TYPE_CHECKING
 
 import faicons as fa
-import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import polars as pl
 from shiny import ui
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 SCB_SOURCE_MD = (
     "Source: [Swedish Occupational Register, SCB]"
@@ -34,7 +39,7 @@ def _nullify(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
     """Replace NaN with Python None in specified columns so Plotly serialises them as JSON null."""
     for col in cols:
         if col in df.columns:
-            df[col] = df[col].astype(object).where(pd.notna(df[col]), None)
+            df[col] = df[col].astype(object).where(df[col].notna(), None)
     return df
 
 
@@ -165,6 +170,8 @@ def build_employment_count_chart(
     1-month % change is shown on hover. When df contains multiple gender series,
     each is drawn as a separate coloured line. Returns an empty figure if df is empty.
     """
+    import pandas as pd
+
     if df.empty:
         return _empty_figure()
 
@@ -225,6 +232,8 @@ def build_employment_chart(
     series, each is drawn as a separate coloured line. Returns an empty figure if
     df is empty.
     """
+    import pandas as pd
+
     if df.empty:
         return _empty_figure()
 
@@ -285,6 +294,8 @@ def build_comparison_employment_plot(
     smooth: bool = False,
 ) -> go.Figure:
     """Build a line chart comparing 1-month employment % change across selected occupations."""
+    import pandas as pd
+
     if df.empty:
         return _empty_figure()
 
@@ -339,6 +350,8 @@ def build_comparison_employment_count_plot(
     smooth: bool = False,
 ) -> go.Figure:
     """Build a line chart comparing absolute monthly employment counts across selected occupations."""
+    import pandas as pd
+
     if df.empty:
         return _empty_figure()
 
@@ -489,8 +502,17 @@ def _strip_emoji(val: object) -> object:
     return val
 
 
+_kaleido_started = False
+
+
 def export_fig(fig: go.Figure, width: int = 1000, height: int = 650) -> bytes:
     """Return PNG bytes of a figure with a solid white background and no emoji labels."""
+    global _kaleido_started
+    if not _kaleido_started:
+        import kaleido
+
+        kaleido.start_sync_server(silence_warnings=True)
+        _kaleido_started = True
     fig = copy.deepcopy(fig)
     for trace in fig.data:
         for field in ("y", "x", "theta", "text", "name"):

@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import faicons as fa
-import kaleido
 import polars as pl
 from shiny import reactive, render
 from shiny.express import app_opts, ui
@@ -44,8 +43,6 @@ from src.visuals import (
     build_value_boxes,
     export_fig,
 )
-
-kaleido.start_sync_server(silence_warnings=True)
 
 LOGOS_PATH = Path(__file__).parent / "logos"
 app_opts(static_assets={"/logos": LOGOS_PATH})
