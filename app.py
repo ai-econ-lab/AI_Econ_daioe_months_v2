@@ -164,40 +164,6 @@ with ui.navset_pill(id="main_tabs"):
 
             with ui.card(full_screen=True, height="700px"):
                 with ui.card_header(class_="d-flex align-items-center gap-2"):
-                    ui.span("AI Exposure by Sub-Domain")
-                    with ui.popover(placement="bottom"):
-                        fa.icon_svg("circle-info", height="1.2em")
-                        "Each bar shows how this occupation ranks against all others for that AI sub-domain. Higher percentile = higher relative AI exposure."
-                    with ui.span(class_="ms-auto"):
-
-                        @render.download(
-                            filename="ai_exposure.png",
-                            media_type="image/png",
-                            label=ui.span(
-                                fa.icon_svg("download"),
-                                title="Download as PNG",
-                            ),
-                        )
-                        def dl_ai_bar():
-                            yield export_fig(
-                                build_ai_exposure_bar(
-                                    occ_ai_exposure_pd(),
-                                    app_input.occ_occupation(),
-                                    int(app_input.occ_year()),
-                                ),
-                            )
-
-                @render_widget
-                def occ_ai_bar():
-                    df = occ_ai_exposure_pd()
-                    return build_ai_exposure_bar(
-                        df,
-                        app_input.occ_occupation(),
-                        int(app_input.occ_year()),
-                    )
-
-            with ui.card(full_screen=True, height="700px"):
-                with ui.card_header(class_="d-flex align-items-center gap-2"):
                     ui.span("Employment ('000)")
                     with ui.popover(placement="bottom"):
                         fa.icon_svg("circle-info", height="1.2em")
@@ -228,6 +194,40 @@ with ui.navset_pill(id="main_tabs"):
                         df,
                         app_input.occ_occupation(),
                         smooth=app_input.occ_smooth(),
+                    )
+
+            with ui.card(full_screen=True, height="700px"):
+                with ui.card_header(class_="d-flex align-items-center gap-2"):
+                    ui.span("AI Exposure by Sub-Domain")
+                    with ui.popover(placement="bottom"):
+                        fa.icon_svg("circle-info", height="1.2em")
+                        "Each bar shows how this occupation ranks against all others for that AI sub-domain. Higher percentile = higher relative AI exposure."
+                    with ui.span(class_="ms-auto"):
+
+                        @render.download(
+                            filename="ai_exposure.png",
+                            media_type="image/png",
+                            label=ui.span(
+                                fa.icon_svg("download"),
+                                title="Download as PNG",
+                            ),
+                        )
+                        def dl_ai_bar():
+                            yield export_fig(
+                                build_ai_exposure_bar(
+                                    occ_ai_exposure_pd(),
+                                    app_input.occ_occupation(),
+                                    int(app_input.occ_year()),
+                                ),
+                            )
+
+                @render_widget
+                def occ_ai_bar():
+                    df = occ_ai_exposure_pd()
+                    return build_ai_exposure_bar(
+                        df,
+                        app_input.occ_occupation(),
+                        int(app_input.occ_year()),
                     )
 
     # ── Tab 2: Comparison View ────────────────────────────────
