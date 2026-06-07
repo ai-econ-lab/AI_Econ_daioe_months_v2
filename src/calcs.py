@@ -37,20 +37,16 @@ def _gender_filter(lf: pl.LazyFrame, gender: str) -> pl.LazyFrame:
     return lf.filter(pl.col("gender") == gender)
 
 
-def get_occ_summary(
+# ── Single Occupation helpers ──────────────────────────────────────────────────
+
+
+def _occ_summary_lf(
     lf: pl.LazyFrame,
     occupation: str,
     year: int,
     gender: str = "All",
-) -> pl.DataFrame:
-    """
-    Return employment and percentage changes for the latest month of the given year.
-
-    Sums emp_count and chg columns across genders per month, derives pct changes from
-    aggregated totals, then picks the most recent month.
-    Returns a single-row DataFrame with columns: emp_count, pct_chg_1m, pct_chg_3m, year, month.
-    Returns an empty DataFrame if no data matches the filters.
-    """
+) -> pl.LazyFrame:
+    """Lazy query for per-occupation monthly employment summary (without collect)."""
     return (
         _gender_filter(lf, gender)
         .filter(
@@ -74,30 +70,23 @@ def get_occ_summary(
         .sort("month_date", descending=True)
         .head(1)
         .select(["emp_count", "pct_chg_1m", "pct_chg_3m", "year", "month"])
-        .collect()
     )
 
 
-def get_occ_ai_exposure(
+def _occ_ai_exposure_lf(
     lf: pl.LazyFrame,
     occupation: str,
     year: int,
-) -> pl.DataFrame:
-    """
-    Return mean weighted AI exposure scores, exposure levels, and percentile ranks per sub-domain.
-
-    Returns a long-format DataFrame with columns: domain, score, level, level_label, percentile.
-    Used to power the ranked horizontal bar chart.
-    """
+) -> pl.LazyFrame:
+    """Lazy query for raw AI exposure columns (without collect)."""
     select_cols = AI_WAVG_COLS + AI_LEVEL_COLS + AI_PCTL_COLS
-    df = (
-        lf.filter(
-            (pl.col("occupation") == occupation) & (pl.col("year") == year),
-        )
-        .select(select_cols)
-        .collect()
-    )
+    return lf.filter(
+        (pl.col("occupation") == occupation) & (pl.col("year") == year),
+    ).select(select_cols)
 
+
+def _process_exposure_df(df: pl.DataFrame) -> pl.DataFrame:
+    """Convert a collected raw exposure DataFrame to long-format for build_ai_exposure_bar."""
     rows = []
     for wavg_col, level_col, pctl_col in zip(
         AI_WAVG_COLS,
@@ -119,6 +108,58 @@ def get_occ_ai_exposure(
             },
         )
     return pl.DataFrame(rows).sort("score")
+
+
+def get_occ_summary(
+    lf: pl.LazyFrame,
+    occupation: str,
+    year: int,
+    gender: str = "All",
+) -> pl.DataFrame:
+    """
+    Return employment and percentage changes for the latest month of the given year.
+
+    Sums emp_count and chg columns across genders per month, derives pct changes from
+    aggregated totals, then picks the most recent month.
+    Returns a single-row DataFrame with columns: emp_count, pct_chg_1m, pct_chg_3m, year, month.
+    Returns an empty DataFrame if no data matches the filters.
+    """
+    return _occ_summary_lf(lf, occupation, year, gender).collect()
+
+
+def get_occ_ai_exposure(
+    lf: pl.LazyFrame,
+    occupation: str,
+    year: int,
+) -> pl.DataFrame:
+    """
+    Return mean weighted AI exposure scores, exposure levels, and percentile ranks per sub-domain.
+
+    Returns a long-format DataFrame with columns: domain, score, level, level_label, percentile.
+    Used to power the ranked horizontal bar chart.
+    """
+    return _process_exposure_df(_occ_ai_exposure_lf(lf, occupation, year).collect())
+
+
+def get_occ_core(
+    lf: pl.LazyFrame,
+    occupation: str,
+    year: int,
+) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """
+    Run the occ summary and AI exposure queries in parallel via collect_all.
+
+    Returns (summary_df, exposure_df) — the same types as get_occ_summary and
+    get_occ_ai_exposure respectively. The summary uses the default gender="All" aggregate;
+    gender breakdowns only affect the employment trend charts, not the value boxes.
+    """
+    summary_df, exposure_raw = pl.collect_all(
+        [
+            _occ_summary_lf(lf, occupation, year),
+            _occ_ai_exposure_lf(lf, occupation, year),
+        ]
+    )
+    return summary_df, _process_exposure_df(exposure_raw)
 
 
 def get_occ_employment(
@@ -233,19 +274,16 @@ def get_comparison_employment(
     return q.drop("month_date").collect()
 
 
-def get_comp_summary(
+# ── Compare Occupations helpers ────────────────────────────────────────────────
+
+
+def _comp_summary_lf(
     lf: pl.LazyFrame,
     occupations: list[str],
     year: int,
     gender: str = "All",
-) -> pl.DataFrame:
-    """
-    Return a per-occupation employment summary for the latest month of the selected year.
-
-    Groups by occupation + month, aggregates for the selected gender (or all genders),
-    derives pct changes from aggregated totals, then picks the most recent month per occupation.
-    Returns a DataFrame with columns: occupation, emp_count, pct_chg_1m, pct_chg_3m, pct_chg_6m.
-    """
+) -> pl.LazyFrame:
+    """Lazy query for per-occupation employment summary for a given year (without collect)."""
     return (
         _gender_filter(lf, gender)
         .filter(
@@ -270,8 +308,38 @@ def get_comp_summary(
         .filter(pl.col("month_date") == pl.col("month_date").max().over("occupation"))
         .select(["occupation", "emp_count", "pct_chg_1m", "pct_chg_3m", "pct_chg_6m"])
         .sort("occupation")
-        .collect()
     )
+
+
+def _comp_radar_lf(
+    lf: pl.LazyFrame,
+    occupations: list[str],
+    year: int,
+) -> pl.LazyFrame:
+    """Lazy query for per-occupation AI percentile scores (without collect)."""
+    return (
+        lf.filter(
+            pl.col("occupation").is_in(occupations) & (pl.col("year") == year),
+        )
+        .group_by("occupation")
+        .agg([pl.col(c).mean() for c in AI_PCTL_COLS])
+    )
+
+
+def get_comp_summary(
+    lf: pl.LazyFrame,
+    occupations: list[str],
+    year: int,
+    gender: str = "All",
+) -> pl.DataFrame:
+    """
+    Return a per-occupation employment summary for the latest month of the selected year.
+
+    Groups by occupation + month, aggregates for the selected gender (or all genders),
+    derives pct changes from aggregated totals, then picks the most recent month per occupation.
+    Returns a DataFrame with columns: occupation, emp_count, pct_chg_1m, pct_chg_3m, pct_chg_6m.
+    """
+    return _comp_summary_lf(lf, occupations, year, gender).collect()
 
 
 def get_comp_radar(
@@ -284,11 +352,26 @@ def get_comp_radar(
 
     Returns a DataFrame with columns: occupation, pctl_<metric>_wavg for each metric.
     """
-    return (
-        lf.filter(
-            pl.col("occupation").is_in(occupations) & (pl.col("year") == year),
-        )
-        .group_by("occupation")
-        .agg([pl.col(c).mean() for c in AI_PCTL_COLS])
-        .collect()
+    return _comp_radar_lf(lf, occupations, year).collect()
+
+
+def get_comp_year_data(
+    lf: pl.LazyFrame,
+    occupations: list[str],
+    year: int,
+    gender: str = "All",
+) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """
+    Run the comp summary and radar queries in parallel via collect_all.
+
+    Returns (summary_df, radar_df) — the same types as get_comp_summary and get_comp_radar.
+    Both share the same year and gender inputs; the employment trend query is kept separate
+    because it has independent inputs (year_range, smooth).
+    """
+    summary_df, radar_df = pl.collect_all(
+        [
+            _comp_summary_lf(lf, occupations, year, gender),
+            _comp_radar_lf(lf, occupations, year),
+        ]
     )
+    return summary_df, radar_df
