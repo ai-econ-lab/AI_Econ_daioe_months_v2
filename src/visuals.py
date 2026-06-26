@@ -37,6 +37,7 @@ _FONT_HEAD = "Montserrat"
 
 def _nullify(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
     """Replace NaN with Python None in specified columns so Plotly serialises them as JSON null."""
+    df = df.copy()
     for col in cols:
         if col in df.columns:
             df[col] = df[col].astype(object).where(df[col].notna(), None)
@@ -408,7 +409,7 @@ def build_comp_radar_plot(df: pd.DataFrame, metrics: dict[str, str]) -> go.Figur
     categories = list(metrics.values())
     fig = go.Figure()
 
-    for _, row in df.iterrows():
+    for row in df.to_dict("records"):
         r_values = [row[f"pctl_{k}_wavg"] for k in metrics]
         r_values_closed = [*r_values, r_values[0]]
         categories_closed = [*categories, categories[0]]
@@ -518,7 +519,7 @@ def export_fig(fig: go.Figure, width: int = 1000, height: int = 650) -> bytes:
         for field in ("y", "x", "theta", "text", "name"):
             val = getattr(trace, field, None)
             if val is not None:
-                with contextlib.suppress(Exception):
+                with contextlib.suppress(AttributeError, TypeError):
                     trace.update({field: _strip_emoji(val)})  # type: ignore[union-attr]
     is_polar = any(getattr(t, "type", "") == "scatterpolar" for t in fig.data)
     fig.update_layout(paper_bgcolor="white", plot_bgcolor="white")
