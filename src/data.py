@@ -1,6 +1,7 @@
 """Data loading, lazy frame, and data-derived input constants."""
 
 from pathlib import Path
+from string import Template
 
 import polars as pl
 
@@ -39,7 +40,7 @@ MONTH_LATEST: str = _months_sorted.tail(1)["month"][0]
 YEAR_MIN: int = min(YEARS)
 YEAR_MAX: int = max(YEARS)
 
-ABOUT_MD: str = _ABOUT_TEMPLATE.format(
+ABOUT_MD: str = Template(_ABOUT_TEMPLATE).safe_substitute(
     MONTH_EARLIEST=MONTH_EARLIEST,
     MONTH_LATEST=MONTH_LATEST,
 )
