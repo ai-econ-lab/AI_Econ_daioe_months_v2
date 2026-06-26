@@ -12,6 +12,11 @@ from shiny import ui
 if TYPE_CHECKING:
     import pandas as pd
 
+_EXCEL_ENGINE: str | None = next(
+    (e for e in ("openpyxl", "xlsxwriter") if importlib.util.find_spec(e) is not None),
+    None,
+)
+
 
 def metric_display_name(metric_key: str, metrics: dict[str, str]) -> str:
     """Return a human-readable metric label with leading icons stripped."""
@@ -104,25 +109,19 @@ def download_media_type(fmt: str) -> str:
         return "application/octet-stream"
     if fmt == "excel":
         return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    return "text/csv"
+    return "text/csv; charset=utf-8"
 
 
-def export_filtered_data(df: pd.DataFrame, fmt: str) -> str | bytes:
+def export_filtered_data(df: pd.DataFrame, fmt: str) -> bytes:
     """Serialise a DataFrame to csv, parquet, or excel bytes for a Shiny download."""
     if fmt == "parquet":
         return df.to_parquet(index=False)
 
     if fmt == "excel":
-        engine = None
-        if importlib.util.find_spec("openpyxl") is not None:
-            engine = "openpyxl"
-        elif importlib.util.find_spec("xlsxwriter") is not None:
-            engine = "xlsxwriter"
-        else:
+        if _EXCEL_ENGINE is None:
             raise ModuleNotFoundError("Excel export requires openpyxl or xlsxwriter.")
-
         buffer = io.BytesIO()
-        df.to_excel(buffer, index=False, engine=engine)
+        df.to_excel(buffer, index=False, engine=_EXCEL_ENGINE)
         return buffer.getvalue()
 
-    return df.to_csv(index=False)
+    return df.to_csv(index=False).encode()

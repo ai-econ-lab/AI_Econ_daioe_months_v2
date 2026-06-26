@@ -15,7 +15,7 @@ This dashboard brings together monthly employment statistics from Statistics Swe
 
 - **Geography**: Sweden (national totals)
 - **Occupation level**: SSYK 2012 major groups (1-digit classification, 9 categories)
-- **Time range**: {MONTH_EARLIEST} to {MONTH_LATEST}, updated monthly
+- **Time range**: ${MONTH_EARLIEST} to ${MONTH_LATEST}, updated monthly
 - **Employment unit**: thousands of people (e.g. 150 = 150,000)
 
 ---

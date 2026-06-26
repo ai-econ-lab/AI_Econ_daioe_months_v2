@@ -78,11 +78,19 @@ def _occ_ai_exposure_lf(
     occupation: str,
     year: int,
 ) -> pl.LazyFrame:
-    """Lazy query for raw AI exposure columns (without collect)."""
+    """Lazy query for raw AI exposure columns (without collect).
+
+    AI exposure scores are constant per occupation/year; .unique() collapses
+    the per-gender/per-month duplicates before the caller averages them.
+    """
     select_cols = AI_WAVG_COLS + AI_LEVEL_COLS + AI_PCTL_COLS
-    return lf.filter(
-        (pl.col("occupation") == occupation) & (pl.col("year") == year),
-    ).select(select_cols)
+    return (
+        lf.filter(
+            (pl.col("occupation") == occupation) & (pl.col("year") == year),
+        )
+        .select(select_cols)
+        .unique()
+    )
 
 
 def _process_exposure_df(df: pl.DataFrame) -> pl.DataFrame:
