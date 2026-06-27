@@ -3,15 +3,13 @@ from __future__ import annotations
 import contextlib
 import copy
 import re
-from typing import TYPE_CHECKING
+import threading
 
 import faicons as fa
+import plotly.express as px
+import plotly.graph_objects as go
 import polars as pl
 from shiny import ui
-
-if TYPE_CHECKING:
-    import pandas as pd
-    import plotly.graph_objects as go
 
 SCB_SOURCE_MD = (
     "Source: [Swedish Occupational Register, SCB]"
@@ -33,16 +31,6 @@ _C_TITLE = "#0C0A3E"
 _FONT_BASE = "Nunito Sans"
 _FONT_HEAD = "Montserrat"
 
-
-def _nullify(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
-    """Replace NaN with Python None in specified columns so Plotly serialises them as JSON null."""
-    df = df.copy()
-    for col in cols:
-        if col in df.columns:
-            df[col] = df[col].astype(object).where(df[col].notna(), None)
-    return df
-
-
 _BASE_LAYOUT: dict = {
     "paper_bgcolor": _C_BG,
     "plot_bgcolor": _C_BG,
@@ -52,11 +40,27 @@ _BASE_LAYOUT: dict = {
     "margin": {"l": 20, "r": 20, "t": 45, "b": 20},
 }
 
+_kaleido_lock = threading.Lock()
+_kaleido_started = False
+
+
+def _ensure_kaleido() -> None:
+    """Start the kaleido server if not already running (thread-safe)."""
+    global _kaleido_started  # noqa: PLW0603
+    with _kaleido_lock:
+        if not _kaleido_started:
+            import kaleido
+
+            kaleido.start_sync_server(silence_warnings=True)
+            _kaleido_started = True
+
+
+# Pre-warm kaleido in background so the first PNG download is not blocked.
+threading.Thread(target=_ensure_kaleido, daemon=True).start()
+
 
 def _empty_figure() -> go.Figure:
     """Return a blank figure with a centered 'No data available' annotation."""
-    import plotly.graph_objects as go
-
     fig = go.Figure()
     fig.add_annotation(
         text="No data available",
@@ -102,6 +106,7 @@ def build_value_boxes(summary: pl.DataFrame, occupation: str) -> ui.Tag:
 
     Returns a div containing a heading, three value boxes (employment count,
     1-month change, 3-month change), and a markdown source note.
+    Raises IndexError if summary is empty — callers must guard with is_empty().
     """
 
     def _arrow(v: float) -> str:
@@ -161,7 +166,7 @@ def build_value_boxes(summary: pl.DataFrame, occupation: str) -> ui.Tag:
 
 
 def build_employment_count_chart(
-    df: pd.DataFrame,
+    df: pl.DataFrame,
     occupation: str,
     *,
     smooth: bool = False,
@@ -172,22 +177,22 @@ def build_employment_count_chart(
     1-month % change is shown on hover. When df contains multiple gender series,
     each is drawn as a separate coloured line. Returns an empty figure if df is empty.
     """
-    import pandas as pd
-
-    import plotly.express as px
-
-    if df.empty:
+    if df.is_empty():
         return _empty_figure()
 
-    multi_gender = "gender" in df.columns and df["gender"].nunique() > 1  # noqa: PD101
+    multi_gender = "gender" in df.columns and df["gender"].n_unique() > 1
 
-    df = df.assign(
-        pct_chg_1m_label=df["pct_chg_1m"].map(
-            lambda v: f"{v:.1f}%" if pd.notna(v) else "N/A",
-        ),
-        _date=pd.to_datetime(df["month"], format="%Y-%b"),
-    ).sort_values(["gender", "_date"] if multi_gender else "_date")
-    df = _nullify(df, ["emp_count"])
+    df = df.with_columns(
+        pl.col("month").str.strptime(pl.Date, "%Y-%b").alias("_date"),
+        pl.when(pl.col("pct_chg_1m").is_not_null())
+        .then(
+            pl.col("pct_chg_1m").map_elements(
+                lambda v: f"{v:.1f}%", return_dtype=pl.String
+            )
+        )
+        .otherwise(pl.lit("N/A"))
+        .alias("pct_chg_1m_label"),
+    ).sort(["gender", "_date"] if multi_gender else ["_date"])
 
     fig = px.line(
         df,
@@ -224,7 +229,7 @@ def build_employment_count_chart(
 
 
 def build_employment_chart(
-    df: pd.DataFrame,
+    df: pl.DataFrame,
     occupation: str,
     *,
     smooth: bool = False,
@@ -236,22 +241,22 @@ def build_employment_chart(
     series, each is drawn as a separate coloured line. Returns an empty figure if
     df is empty.
     """
-    import pandas as pd
-
-    import plotly.express as px
-
-    if df.empty:
+    if df.is_empty():
         return _empty_figure()
 
-    multi_gender = "gender" in df.columns and df["gender"].nunique() > 1  # noqa: PD101
+    multi_gender = "gender" in df.columns and df["gender"].n_unique() > 1
 
-    df = _nullify(df, ["pct_chg_1m"])
-    df = df.assign(
-        emp_count_label=df["emp_count"].map(
-            lambda v: f"{v:,.0f}" if pd.notna(v) else "N/A",
-        ),
-        _date=pd.to_datetime(df["month"], format="%Y-%b"),
-    ).sort_values(["gender", "_date"] if multi_gender else "_date")
+    df = df.with_columns(
+        pl.col("month").str.strptime(pl.Date, "%Y-%b").alias("_date"),
+        pl.when(pl.col("emp_count").is_not_null())
+        .then(
+            pl.col("emp_count").map_elements(
+                lambda v: f"{v:,.0f}", return_dtype=pl.String
+            )
+        )
+        .otherwise(pl.lit("N/A"))
+        .alias("emp_count_label"),
+    ).sort(["gender", "_date"] if multi_gender else ["_date"])
 
     fig = px.line(
         df,
@@ -295,24 +300,25 @@ def build_employment_chart(
 
 
 def build_comparison_employment_plot(
-    df: pd.DataFrame,
+    df: pl.DataFrame,
     *,
     smooth: bool = False,
 ) -> go.Figure:
     """Build a line chart comparing 1-month employment % change across selected occupations."""
-    import pandas as pd
-    import plotly.express as px
-
-    if df.empty:
+    if df.is_empty():
         return _empty_figure()
 
-    df = _nullify(df, ["pct_chg_1m"])
-    df = df.assign(
-        emp_count_label=df["emp_count"].map(
-            lambda v: f"{v:,.0f}" if pd.notna(v) else "N/A",
-        ),
-        _date=pd.to_datetime(df["month"], format="%Y-%b"),
-    ).sort_values(["occupation", "_date"])
+    df = df.with_columns(
+        pl.col("month").str.strptime(pl.Date, "%Y-%b").alias("_date"),
+        pl.when(pl.col("emp_count").is_not_null())
+        .then(
+            pl.col("emp_count").map_elements(
+                lambda v: f"{v:,.0f}", return_dtype=pl.String
+            )
+        )
+        .otherwise(pl.lit("N/A"))
+        .alias("emp_count_label"),
+    ).sort(["occupation", "_date"])
 
     fig = px.line(
         df,
@@ -352,24 +358,25 @@ def build_comparison_employment_plot(
 
 
 def build_comparison_employment_count_plot(
-    df: pd.DataFrame,
+    df: pl.DataFrame,
     *,
     smooth: bool = False,
 ) -> go.Figure:
     """Build a line chart comparing absolute monthly employment counts across selected occupations."""
-    import pandas as pd
-    import plotly.express as px
-
-    if df.empty:
+    if df.is_empty():
         return _empty_figure()
 
-    df = df.assign(
-        pct_chg_1m_label=df["pct_chg_1m"].map(
-            lambda v: f"{v:.1f}%" if pd.notna(v) else "N/A",
-        ),
-        _date=pd.to_datetime(df["month"], format="%Y-%b"),
-    ).sort_values(["occupation", "_date"])
-    df = _nullify(df, ["emp_count"])
+    df = df.with_columns(
+        pl.col("month").str.strptime(pl.Date, "%Y-%b").alias("_date"),
+        pl.when(pl.col("pct_chg_1m").is_not_null())
+        .then(
+            pl.col("pct_chg_1m").map_elements(
+                lambda v: f"{v:.1f}%", return_dtype=pl.String
+            )
+        )
+        .otherwise(pl.lit("N/A"))
+        .alias("pct_chg_1m_label"),
+    ).sort(["occupation", "_date"])
 
     title_suffix = " (3-Month Moving Average)" if smooth else ""
     fig = px.line(
@@ -405,20 +412,15 @@ def build_comparison_employment_count_plot(
     return fig
 
 
-def build_comp_radar_plot(df: pd.DataFrame, metrics: dict[str, str]) -> go.Figure:
+def build_comp_radar_plot(df: pl.DataFrame, metrics: dict[str, str]) -> go.Figure:
     """Build a radar chart comparing AI percentile scores across selected occupations."""
-    import plotly.graph_objects as go
-
-    if df.empty:
+    if df.is_empty():
         return _empty_figure()
-
-    pctl_cols = [f"pctl_{k}_wavg" for k in metrics]
-    df = _nullify(df, pctl_cols)
 
     categories = list(metrics.values())
     fig = go.Figure()
 
-    for row in df.to_dict("records"):
+    for row in df.to_dicts():
         r_values = [row[f"pctl_{k}_wavg"] for k in metrics]
         r_values_closed = [*r_values, r_values[0]]
         categories_closed = [*categories, categories[0]]
@@ -449,7 +451,7 @@ def build_comp_radar_plot(df: pd.DataFrame, metrics: dict[str, str]) -> go.Figur
 
 
 def build_ai_exposure_bar(
-    df: pd.DataFrame,
+    df: pl.DataFrame,
     occupation: str,
     year: int,
 ) -> go.Figure:
@@ -459,20 +461,16 @@ def build_ai_exposure_bar(
     Bar colour intensity is driven by the percentile rank score.
     Hover shows exposure level label, index score, and percentile rank.
     """
-    import plotly.graph_objects as go
-
-    if df.empty:
+    if df.is_empty():
         return _empty_figure()
-
-    df = _nullify(df, ["score", "level", "percentile"])
 
     fig = go.Figure(
         go.Bar(
-            x=df["percentile"],
-            y=df["domain"],
+            x=df["percentile"].to_list(),
+            y=df["domain"].to_list(),
             orientation="h",
             marker={
-                "color": df["percentile"],
+                "color": df["percentile"].to_list(),
                 "colorscale": "Blues",
                 "colorbar": {"title": "Percentile Rank"},
                 "showscale": True,
@@ -480,7 +478,12 @@ def build_ai_exposure_bar(
                 "cmax": 100,
             },
             customdata=list(
-                zip(df["level_label"], df["level"], df["score"], strict=False),
+                zip(
+                    df["level_label"].to_list(),
+                    df["level"].to_list(),
+                    df["score"].to_list(),
+                    strict=False,
+                ),
             ),
             hovertemplate=(
                 "<b>%{y}</b><br>"
@@ -514,17 +517,9 @@ def _strip_emoji(val: object) -> object:
     return val
 
 
-_kaleido_started = False
-
-
 def export_fig(fig: go.Figure, width: int = 1000, height: int = 650) -> bytes:
     """Return PNG bytes of a figure with a solid white background and no emoji labels."""
-    global _kaleido_started
-    if not _kaleido_started:
-        import kaleido
-
-        kaleido.start_sync_server(silence_warnings=True)
-        _kaleido_started = True
+    _ensure_kaleido()
     fig = copy.deepcopy(fig)
     for trace in fig.data:
         for field in ("y", "x", "theta", "text", "name"):
