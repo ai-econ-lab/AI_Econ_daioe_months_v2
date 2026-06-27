@@ -6,13 +6,12 @@ import re
 from typing import TYPE_CHECKING
 
 import faicons as fa
-import plotly.express as px
-import plotly.graph_objects as go
 import polars as pl
 from shiny import ui
 
 if TYPE_CHECKING:
     import pandas as pd
+    import plotly.graph_objects as go
 
 SCB_SOURCE_MD = (
     "Source: [Swedish Occupational Register, SCB]"
@@ -56,6 +55,8 @@ _BASE_LAYOUT: dict = {
 
 def _empty_figure() -> go.Figure:
     """Return a blank figure with a centered 'No data available' annotation."""
+    import plotly.graph_objects as go
+
     fig = go.Figure()
     fig.add_annotation(
         text="No data available",
@@ -173,6 +174,8 @@ def build_employment_count_chart(
     """
     import pandas as pd
 
+    import plotly.express as px
+
     if df.empty:
         return _empty_figure()
 
@@ -235,6 +238,8 @@ def build_employment_chart(
     """
     import pandas as pd
 
+    import plotly.express as px
+
     if df.empty:
         return _empty_figure()
 
@@ -296,6 +301,7 @@ def build_comparison_employment_plot(
 ) -> go.Figure:
     """Build a line chart comparing 1-month employment % change across selected occupations."""
     import pandas as pd
+    import plotly.express as px
 
     if df.empty:
         return _empty_figure()
@@ -352,6 +358,7 @@ def build_comparison_employment_count_plot(
 ) -> go.Figure:
     """Build a line chart comparing absolute monthly employment counts across selected occupations."""
     import pandas as pd
+    import plotly.express as px
 
     if df.empty:
         return _empty_figure()
@@ -400,6 +407,8 @@ def build_comparison_employment_count_plot(
 
 def build_comp_radar_plot(df: pd.DataFrame, metrics: dict[str, str]) -> go.Figure:
     """Build a radar chart comparing AI percentile scores across selected occupations."""
+    import plotly.graph_objects as go
+
     if df.empty:
         return _empty_figure()
 
@@ -450,6 +459,8 @@ def build_ai_exposure_bar(
     Bar colour intensity is driven by the percentile rank score.
     Hover shows exposure level label, index score, and percentile rank.
     """
+    import plotly.graph_objects as go
+
     if df.empty:
         return _empty_figure()
 
