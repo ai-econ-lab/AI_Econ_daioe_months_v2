@@ -84,7 +84,7 @@ with ui.navset_pill(id="main_tabs"):
             )
             ui.input_selectize(
                 "occ_gender",
-                "Show gender lines",
+                "Show gender line(s)",
                 choices={s: s.capitalize() for s in GENDERS},
                 multiple=True,
                 options={"placeholder": "Select to overlay..."},
