@@ -216,9 +216,7 @@ def get_occ_employment(
                     .alias("pct_chg_1m"),
                 ],
             )
-        return q.filter(
-            (pl.col("year") >= year_min) & (pl.col("year") <= year_max)
-        ).drop("month_date")
+        return q.filter((pl.col("year") >= year_min) & (pl.col("year") <= year_max))
 
     lazy_frames = [_monthly_lf(base, "All")]
     for s in extra_genders:
@@ -279,7 +277,7 @@ def get_comparison_employment(
         q = q.filter(
             (pl.col("year") >= year_range[0]) & (pl.col("year") <= year_range[1]),
         )
-    return q.drop("month_date").collect()
+    return q.collect()
 
 
 # ── Compare Occupations helpers ────────────────────────────────────────────────

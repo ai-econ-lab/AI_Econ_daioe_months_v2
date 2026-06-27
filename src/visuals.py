@@ -183,25 +183,20 @@ def build_employment_count_chart(
     multi_gender = "gender" in df.columns and df["gender"].n_unique() > 1
 
     df = df.with_columns(
-        pl.col("month").str.strptime(pl.Date, "%Y-%b").alias("_date"),
         pl.when(pl.col("pct_chg_1m").is_not_null())
-        .then(
-            pl.col("pct_chg_1m").map_elements(
-                lambda v: f"{v:.1f}%", return_dtype=pl.String
-            )
-        )
+        .then(pl.col("pct_chg_1m").round(1).cast(pl.String) + pl.lit("%"))
         .otherwise(pl.lit("N/A"))
-        .alias("pct_chg_1m_label"),
-    ).sort(["gender", "_date"] if multi_gender else ["_date"])
+        .alias("_pct_label"),
+    ).sort(["gender", "month_date"] if multi_gender else ["month_date"])
 
     fig = px.line(
         df,
-        x="_date",
+        x="month_date",
         y="emp_count",
         color="gender" if multi_gender else None,
         markers=True,
-        custom_data=["pct_chg_1m_label", "month"],
-        labels={"_date": "Month", "emp_count": "Employment", "gender": "Gender"},
+        custom_data=["_pct_label", "month"],
+        labels={"month_date": "Month", "emp_count": "Employment", "gender": "Gender"},
     )
     fig.update_traces(
         line={"width": 3},
@@ -246,27 +241,17 @@ def build_employment_chart(
 
     multi_gender = "gender" in df.columns and df["gender"].n_unique() > 1
 
-    df = df.with_columns(
-        pl.col("month").str.strptime(pl.Date, "%Y-%b").alias("_date"),
-        pl.when(pl.col("emp_count").is_not_null())
-        .then(
-            pl.col("emp_count").map_elements(
-                lambda v: f"{v:,.0f}", return_dtype=pl.String
-            )
-        )
-        .otherwise(pl.lit("N/A"))
-        .alias("emp_count_label"),
-    ).sort(["gender", "_date"] if multi_gender else ["_date"])
+    df = df.sort(["gender", "month_date"] if multi_gender else ["month_date"])
 
     fig = px.line(
         df,
-        x="_date",
+        x="month_date",
         y="pct_chg_1m",
         color="gender" if multi_gender else None,
         markers=True,
-        custom_data=["emp_count_label", "month"],
+        custom_data=["emp_count", "month"],
         labels={
-            "_date": "Month",
+            "month_date": "Month",
             "pct_chg_1m": "Employment change (%)",
             "gender": "Gender",
         },
@@ -277,7 +262,7 @@ def build_employment_chart(
         hovertemplate=(
             "Month: %{customdata[1]}<br>"
             "Change: %{y:.1f}%<br>"
-            "Employment: %{customdata[0]}<extra></extra>"
+            "Employment: %{customdata[0]:,.0f}<extra></extra>"
         ),
         connectgaps=True,
     )
@@ -308,26 +293,16 @@ def build_comparison_employment_plot(
     if df.is_empty():
         return _empty_figure()
 
-    df = df.with_columns(
-        pl.col("month").str.strptime(pl.Date, "%Y-%b").alias("_date"),
-        pl.when(pl.col("emp_count").is_not_null())
-        .then(
-            pl.col("emp_count").map_elements(
-                lambda v: f"{v:,.0f}", return_dtype=pl.String
-            )
-        )
-        .otherwise(pl.lit("N/A"))
-        .alias("emp_count_label"),
-    ).sort(["occupation", "_date"])
+    df = df.sort(["occupation", "month_date"])
 
     fig = px.line(
         df,
-        x="_date",
+        x="month_date",
         y="pct_chg_1m",
         color="occupation",
         markers=True,
-        custom_data=["emp_count_label", "month"],
-        labels={"pct_chg_1m": "Employment Change (%)", "_date": "Month"},
+        custom_data=["emp_count", "month"],
+        labels={"pct_chg_1m": "Employment Change (%)", "month_date": "Month"},
     )
     fig.update_traces(
         line={"width": 3},
@@ -336,7 +311,7 @@ def build_comparison_employment_plot(
             "<b>%{fullData.name}</b><br>"
             "Month: %{customdata[1]}<br>"
             "Change: %{y:.1f}%<br>"
-            "Employment: %{customdata[0]}<extra></extra>"
+            "Employment: %{customdata[0]:,.0f}<extra></extra>"
         ),
         connectgaps=True,
     )
@@ -367,26 +342,21 @@ def build_comparison_employment_count_plot(
         return _empty_figure()
 
     df = df.with_columns(
-        pl.col("month").str.strptime(pl.Date, "%Y-%b").alias("_date"),
         pl.when(pl.col("pct_chg_1m").is_not_null())
-        .then(
-            pl.col("pct_chg_1m").map_elements(
-                lambda v: f"{v:.1f}%", return_dtype=pl.String
-            )
-        )
+        .then(pl.col("pct_chg_1m").round(1).cast(pl.String) + pl.lit("%"))
         .otherwise(pl.lit("N/A"))
-        .alias("pct_chg_1m_label"),
-    ).sort(["occupation", "_date"])
+        .alias("_pct_label"),
+    ).sort(["occupation", "month_date"])
 
     title_suffix = " (3-Month Moving Average)" if smooth else ""
     fig = px.line(
         df,
-        x="_date",
+        x="month_date",
         y="emp_count",
         color="occupation",
         markers=True,
-        custom_data=["pct_chg_1m_label", "month"],
-        labels={"emp_count": "Employment ('000)", "_date": "Month"},
+        custom_data=["_pct_label", "month"],
+        labels={"emp_count": "Employment ('000)", "month_date": "Month"},
     )
     fig.update_traces(
         line={"width": 3},
