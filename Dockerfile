@@ -25,18 +25,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     chromium \
     && rm -rf /var/lib/apt/lists/*
 
+# Non-root runtime user (UID 1000, matching Hugging Face Spaces' expected user).
+RUN useradd --create-home --uid 1000 appuser
+
 # Environment set-up
 COPY --from=builder /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
 
 # Copy only what the app needs at runtime
-COPY app.py ./app.py
-COPY src ./src
-COPY md_files ./md_files
-COPY data ./data
-COPY logos ./logos
-COPY _brand.yml ./_brand.yml
-COPY README.md ./README.md
+COPY --chown=appuser:appuser app.py ./app.py
+COPY --chown=appuser:appuser src ./src
+COPY --chown=appuser:appuser md_files ./md_files
+COPY --chown=appuser:appuser data ./data
+COPY --chown=appuser:appuser logos ./logos
+COPY --chown=appuser:appuser _brand.yml ./_brand.yml
+COPY --chown=appuser:appuser README.md ./README.md
+
+USER appuser
 
 # HF Spaces ignores health checks, but this matters if deployed elsewhere (Cloud Run, ECS, etc.)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
