@@ -17,11 +17,18 @@ _EXCEL_ENGINE: str | None = next(
     None,
 )
 
+# Matches leading emoji glyphs only (not general non-alphanumeric text), so
+# labels are never mistaken for a decorative prefix. Kept in sync with the
+# equivalent _EMOJI_PREFIX pattern in src/visuals.py.
+_EMOJI_PREFIX = re.compile(
+    r"^[\U0001F000-\U0001FAFF☀-➿️‍]+\s*",
+)
+
 
 def metric_display_name(metric_key: str, metrics: dict[str, str]) -> str:
     """Return a human-readable metric label with leading icons stripped."""
     label = metrics.get(metric_key, metric_key.replace("_", " ").title())
-    return re.sub(r"^[^A-Za-z0-9]+\s*", "", label).strip()
+    return _EMOJI_PREFIX.sub("", label).strip()
 
 
 def readable_column_name(col: str, metrics: dict[str, str]) -> str:

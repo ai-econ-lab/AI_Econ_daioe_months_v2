@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import contextlib
 import copy
 import re
 import threading
@@ -20,7 +19,13 @@ SCB_SOURCE_MD = (
 
 DAIOE_SOURCE_MD = "Source: [DAIOEs](https://www.ai-econlab.com/ai-exposure-daioe)"
 
-_EMOJI_PREFIX = re.compile(r"^[^\x00-\x7F]+\s*")
+# Matches leading emoji glyphs only (not general non-ASCII text such as Swedish
+# å/ä/ö), so label text is never mistaken for a decorative prefix. Ranges cover
+# the main emoji blocks, misc symbols & dingbats (e.g. U+265F "♟"), variation
+# selector-16 (U+FE0F) and zero-width joiner (U+200D) for multi-codepoint emoji.
+_EMOJI_PREFIX = re.compile(
+    r"^[\U0001F000-\U0001FAFF☀-➿️‍]+\s*",
+)
 
 # Brand colours from _brand.yml
 _C_BG = "rgba(0,0,0,0)"
@@ -495,8 +500,7 @@ def export_fig(fig: go.Figure, width: int = 1000, height: int = 650) -> bytes:
         for field in ("y", "x", "theta", "text", "name"):
             val = getattr(trace, field, None)
             if val is not None:
-                with contextlib.suppress(AttributeError, TypeError):
-                    trace.update({field: _strip_emoji(val)})  # type: ignore[union-attr]
+                trace.update({field: _strip_emoji(val)})  # type: ignore[union-attr]
     is_polar = any(getattr(t, "type", "") == "scatterpolar" for t in fig.data)
     fig.update_layout(paper_bgcolor="white", plot_bgcolor="white")
     if is_polar:
