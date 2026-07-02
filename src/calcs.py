@@ -94,7 +94,14 @@ def _occ_ai_exposure_lf(
 
 
 def _process_exposure_df(df: pl.DataFrame) -> pl.DataFrame:
-    """Convert a collected raw exposure DataFrame to long-format for build_ai_exposure_bar."""
+    """Convert a collected raw exposure DataFrame to long-format for build_ai_exposure_bar.
+
+    Returns an empty DataFrame if df has no rows, so callers' is_empty() checks
+    (e.g. build_ai_exposure_bar) correctly detect missing data instead of
+    receiving placeholder rows with null scores.
+    """
+    if df.is_empty():
+        return pl.DataFrame()
     rows = []
     for wavg_col, level_col, pctl_col in zip(
         AI_WAVG_COLS,
@@ -110,7 +117,7 @@ def _process_exposure_df(df: pl.DataFrame) -> pl.DataFrame:
                 "score": df[wavg_col].mean(),
                 "level": level_val,
                 "level_label": EXPOSURE_LABELS.get(level_val, "Unknown")
-                if level_val
+                if level_val is not None
                 else "Unknown",
                 "percentile": df[pctl_col].mean(),
             },
