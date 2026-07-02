@@ -1,2 +1,6 @@
 .ruff_cache/
 .venv/
+.claude/
+CLAUDE.md
+src/__pycache__/
+docs/
