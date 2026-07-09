@@ -1,10 +1,7 @@
 name: Sync to Hugging Face Hub
 on:
-  push:
-    branches: [main]
-
   schedule:
-    - cron: "0 0 * * *"  # daily at 00:00 UTC
+    - cron: "0 0 * * 0"  # weekly at 00:00 UTC on Sunday
 
   workflow_dispatch:
 
