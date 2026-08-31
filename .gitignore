@@ -4,3 +4,8 @@
 CLAUDE.md
 src/__pycache__/
 docs/
+
+# Generated pipeline data: fetched from the pipeline-data-latest
+# GitHub release (see workflow 02) instead of relying on this
+# branch's tree already having it.
+data/
