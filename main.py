@@ -66,6 +66,13 @@ def build_scb_monthly_changes(scb_lf: pl.LazyFrame) -> pl.LazyFrame:
         .with_columns(pl.col("value").cast(pl.Float64, strict=False))
         .group_by(change_keys)
         .agg(pl.col("value").sum().alias("emp_count"))
+        # Belt-and-suspenders against float-summation-order drift: group
+        # reductions are parallelised, so a last-ULP difference between runs
+        # is possible (confirmed empirically: ~1e-13 on a handful of rows).
+        # Rounded before it propagates into chg_*/pct_chg_*, which would
+        # otherwise carry the same noise forward and keep the file
+        # byte-unstable indefinitely.
+        .with_columns(pl.col("emp_count").round(6))
         .with_columns(month_date_expr.alias("_month_date"))
         .with_columns(
             emp.shift(i).over(group_keys, order_by="_month_date").alias(f"_emp_{i}m")
@@ -146,6 +153,12 @@ def build_monthly_panel(
     daioe_lazy_lf_extended: pl.LazyFrame,
 ) -> pl.LazyFrame:
     """Join the cleaned SCB monthly data with the extended DAIOE data."""
+    # Canonical row order so identical data always serialises to identical
+    # bytes. Polars gives no row-order guarantee for join() by default (its
+    # own docs: output order "might differ across Polars versions or even
+    # between different runs") -- the sort inside
+    # build_scb_monthly_changes() is discarded by this join, so the real
+    # sort has to happen here, after it, not before.
     return (
         scb_lazy_lf_changes
         .join(
@@ -153,8 +166,14 @@ def build_monthly_panel(
             left_on=["code_1", "year"],
             right_on=["ssyk_code", "year"],
             how="left",
+            validate="m:1",
         )
         .drop("level")
+        .with_columns(
+            pl.col("month").str.strptime(pl.Date, "%Y-%b", strict=False).alias("_month_date"),
+        )
+        .sort(["code_1", "sex", "occupation", "_month_date"])
+        .drop("_month_date")
     )
 
 
