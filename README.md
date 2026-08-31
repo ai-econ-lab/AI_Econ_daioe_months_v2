@@ -84,8 +84,9 @@ md_files/
 
 ## CI Pipeline
 
-```
-scb_pull -> daioe_pull -> development -> main -> Hugging Face Spaces
+```mermaid
+graph LR
+    scb_pull --> daioe_pull --> development --> main --> HF[Hugging Face Spaces]
 ```
 
 Each stage runs on push, daily cron at 00:00 UTC, or manual `workflow_dispatch`.
