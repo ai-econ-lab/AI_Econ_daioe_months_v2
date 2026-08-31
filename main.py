@@ -18,6 +18,13 @@ TABLES = {
 DEFAULT_TAB_ID = "month_tab"
 OUTPUT_FILENAME = "scb_months.parquet"
 
+# Canonical row order so identical data always serialises to identical bytes;
+# the SCB API response order is not guaranteed stable across runs, and
+# without this every write looked like a data change to git regardless of
+# content. Sort on the parsed date, not the formatted "%Y-%b" string
+# (e.g. "2015-Apr"), which sorts lexically wrong.
+SORT_KEY = ["code_1", "sex", "_month_date"]
+
 
 def get_scb_client(tab_id: str = DEFAULT_TAB_ID) -> SCB:
     """Initialize and return the SCB client for a given table ID."""
@@ -134,11 +141,12 @@ def transform_data(
                 pl.col("month_raw")
                 .str.replace("M", "-")
                 .str.strptime(pl.Date, "%Y-%m")
-                .dt.strftime("%Y-%b")
-                .alias("month"),
+                .alias("_month_date"),
                 pl.col("value").cast(pl.Utf8, strict=False),
             ],
         )
+        .with_columns(pl.col("_month_date").dt.strftime("%Y-%b").alias("month"))
+        .sort(SORT_KEY)
         .select(["code_1", "sex", "month", "value", "occupation"])
     )
 
