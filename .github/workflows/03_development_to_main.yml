@@ -15,7 +15,7 @@ on:
         required: false
         default: "main"
   schedule:
-    - cron: "0 0 * * *"  # daily at 00:00 UTC
+    - cron: "45 0 * * *"  # daily at 00:45 UTC (offset from workflows 01/02)
 
 concurrency:
   group: deploy-sync-${{ github.workflow }}-${{ github.ref }}
@@ -51,8 +51,6 @@ jobs:
           cd source
           required_files=(
             "app.py"
-            "_brand.yml"
-            "logos/lab.svg"
             "data/scb_months_lvl1.parquet"
             "Dockerfile"
             ".dockerignore"
@@ -82,8 +80,6 @@ jobs:
           cd source
           files=(
             "app.py"
-            "_brand.yml"
-            "logos/lab.svg"
             "data/scb_months_lvl1.parquet"
             "Dockerfile"
             ".dockerignore"
@@ -122,8 +118,6 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -- \
             app.py \
-            _brand.yml \
-            logos/lab.svg \
             data/scb_months_lvl1.parquet \
             Dockerfile \
             .dockerignore \
@@ -144,4 +138,16 @@ jobs:
             exit 0
           fi
           git commit -m "chore: promote deployable app files [skip ci]"
-          git push origin "${TARGET_BRANCH}"
+
+          for attempt in 1 2 3 4 5; do
+            if git push origin "${TARGET_BRANCH}"; then
+              exit 0
+            fi
+            echo "Push rejected (attempt ${attempt}/5); rebasing onto latest ${TARGET_BRANCH} and retrying..."
+            git fetch origin "${TARGET_BRANCH}"
+            git rebase "origin/${TARGET_BRANCH}"
+            sleep $((attempt * 5))
+          done
+
+          echo "ERROR: failed to push to ${TARGET_BRANCH} after 5 attempts."
+          exit 1
