@@ -98,13 +98,6 @@ Each stage runs on push, daily cron at 00:00 UTC, or manual `workflow_dispatch`.
 | `development` | `03_development_to_main.yml` | Validates and promotes all deploy files to `main` |
 | `main` | `sync_to_hub.yml` | Syncs `main` to the Hugging Face Space, triggering a Docker rebuild |
 
-## Licensing
-
-Code (`app.py`, `scripts/`, `_brand.yml`) is MIT-licensed; see `LICENSE`. The
-published dataset under `data/` is CC BY 4.0-licensed; see `data/LICENSE`.
-This matches the licensing of `ai-econ-lab/daioe_translations` (MIT) and
-`ai-econ-lab/daioe_dataset` (CC BY 4.0).
-
 ## About the Project
 
 Developed by the [AI-Econ Lab](https://www.ai-econlab.com) as part of ongoing research into the intersection of artificial intelligence and labour markets.
