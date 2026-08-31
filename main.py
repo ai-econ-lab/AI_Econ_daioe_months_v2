@@ -4,14 +4,20 @@ from pathlib import Path
 
 import polars as pl
 
+# ai-econ-lab/AI_Econ_daioe_years_v2's main branch, not the retired
+# ai-econ-lab/AI_Econ_daioe_years (superseded, its own daily pipeline
+# duplicated this one's SCB fetch; _v2's output is a verified strict
+# superset of what the old repo produced, plus chg_*/pct_chg_* columns
+# it never had).
 DAIOE_SOURCE = (
-    "https://raw.githubusercontent.com/joseph-data/AI_Econ_daioe_years/"
-    "development/data/daioe_scb_years_all_levels.parquet"
+    "https://raw.githubusercontent.com/ai-econ-lab/AI_Econ_daioe_years_v2/"
+    "main/data/daioe_scb_years_processed.parquet"
 )
-SCB_SOURCE = (
-    "https://raw.githubusercontent.com/joseph-data/AI_Econ_daioe_months_v2/"
-    "daioe_pull/data/scb_months.parquet"
-)
+# This branch's own data/scb_months.parquet, already checked out by the
+# workflow in the same job; was previously fetched over HTTP from this
+# same repo under the wrong owner (joseph-data), which never made sense
+# for a same-branch local file.
+SCB_SOURCE = Path(__file__).resolve().parent / "data" / "scb_months.parquet"
 OUTPUT_NAME = "scb_months_lvl1.parquet"
 
 
@@ -28,8 +34,8 @@ def pct_change(current: pl.Expr, shifted: pl.Expr) -> pl.Expr:
     )
 
 
-def load_sources(daioe_source: str, scb_source: str) -> tuple[pl.LazyFrame, pl.LazyFrame]:
-    """Scan remote Parquet sources and return them as Polars LazyFrames."""
+def load_sources(daioe_source: str, scb_source: str | Path) -> tuple[pl.LazyFrame, pl.LazyFrame]:
+    """Scan the DAIOE (remote) and SCB (local) Parquet sources as LazyFrames."""
     return pl.scan_parquet(daioe_source), pl.scan_parquet(scb_source)
 
 
