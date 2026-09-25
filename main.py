@@ -18,6 +18,13 @@ TABLES = {
 DEFAULT_TAB_ID = "month_tab"
 OUTPUT_FILENAME = "scb_months.parquet"
 
+# The table crosses every figure with three overlapping "degree of attachment
+# to the labour market" categories (total employment, employees total, and
+# permanent employees, a subset of employees). They are not additive, so only
+# one can be published; summing all three counted each employed person about
+# 2.7 times.
+DEGREE_OF_ATTACHMENT = "total employment"
+
 # Canonical row order so identical data always serialises to identical bytes;
 # the SCB API response order is not guaranteed stable across runs, and
 # without this every write looked like a data change to git regardless of
@@ -54,6 +61,9 @@ def extract_metadata_keys(scb: SCB) -> dict[str, Any]:
             raise KeyError(msg) from err
 
     dg_key = find_key("degree")
+    if DEGREE_OF_ATTACHMENT not in var_[dg_key]:
+        msg = f"Degree of attachment {DEGREE_OF_ATTACHMENT!r} not in {var_[dg_key]}"
+        raise ValueError(msg)
     occ_key = find_key("occupation")
     obs_key = find_key("observations")
     month_key = find_key("month")
@@ -61,7 +71,7 @@ def extract_metadata_keys(scb: SCB) -> dict[str, Any]:
 
     return {
         "attachment_key": "".join(dg_key.split()),
-        "degree": var_[dg_key],
+        "degree": [DEGREE_OF_ATTACHMENT],
         "occupations_key": occ_key,
         "occupations": var_[occ_key],
         "observations_key": obs_key,
@@ -154,38 +164,26 @@ def transform_data(
 
 
 def main():
-    """Main execution flow."""
-    try:
-        # Setup paths
-        root = Path.cwd().resolve()
-        data_dir = root / "data"
-        data_dir.mkdir(parents=True, exist_ok=True)
+    """Main execution flow; any failure propagates so CI fails loudly."""
+    root = Path.cwd().resolve()
+    data_dir = root / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
 
-        # Initialize
-        scb_client = get_scb_client()
+    scb_client = get_scb_client()
+    metadata = extract_metadata_keys(scb_client)
 
-        # Metadata extraction
-        metadata = extract_metadata_keys(scb_client)
+    raw_data = fetch_scb_data(scb_client, metadata)
+    if not raw_data:
+        msg = "No data fetched from SCB."
+        raise RuntimeError(msg)
 
-        # Fetch
-        raw_data = fetch_scb_data(scb_client, metadata)
+    df = transform_data(raw_data, scb_client, metadata)
 
-        if not raw_data:
-            logger.error("No data fetched from SCB.")
-            return
-
-        # Transform
-        df = transform_data(raw_data, scb_client, metadata)
-
-        # Save
-        output_path = data_dir / OUTPUT_FILENAME
-        df.write_parquet(output_path)
-        logger.info("Successfully saved processed data to %s", output_path)
-        logger.info("DataFrame shape: %s", df.shape)
-        print(df.head(10))
-
-    except Exception:
-        logger.exception("An error occurred during execution")
+    output_path = data_dir / OUTPUT_FILENAME
+    df.write_parquet(output_path)
+    logger.info("Successfully saved processed data to %s", output_path)
+    logger.info("DataFrame shape: %s", df.shape)
+    print(df.head(10))
 
 
 if __name__ == "__main__":
