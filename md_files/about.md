@@ -6,7 +6,7 @@ This dashboard brings together monthly employment statistics from Statistics Swe
 
 | Source | Description |
 |---|---|
-| [Labour Force Survey (AKU), SCB](https://www.statistikdatabasen.scb.se/pxweb/sv/ssd/START__AM__AM0401__AM0401I/NAKUSysselYrke2012M/) | Monthly employment counts and changes by occupation and gender |
+| [Labour Force Survey (AKU), SCB](https://www.statistikdatabasen.scb.se/pxweb/sv/ssd/START__AM__AM0401__AM0401I/NAKUSysselYrke2012M/) | Monthly counts of employed persons (SCB's "total employment" category) and changes, by occupation and gender |
 | [DAIOE Framework](https://www.ai-econlab.com/ai-exposure-daioe) | Data-driven AI Occupational Exposure scores across multiple AI capability sub-domains |
 
 ---
@@ -17,6 +17,8 @@ This dashboard brings together monthly employment statistics from Statistics Swe
 - **Occupation level**: SSYK 2012 major groups (1-digit classification, 9 categories)
 - **Time range**: ${MONTH_EARLIEST} to ${MONTH_LATEST}, updated monthly
 - **Employment unit**: thousands of people (e.g. 150 = 150,000)
+- **Missing values**: where SCB suppresses an estimate for a small group in a month (five months for women in the agricultural, horticultural, forestry and fishery group), the value is left blank, not shown as zero
+- **Exposure gaps**: DAIOE has no image comprehension scores for 2015, so that sub-domain is left out of the exposure chart for that year
 
 ---
 
