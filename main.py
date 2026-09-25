@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import polars as pl
+import polars.selectors as cs
 
 # ai-econ-lab/AI_Econ_daioe_years_v2's main branch, not the retired
 # ai-econ-lab/AI_Econ_daioe_years (superseded, its own daily pipeline
@@ -65,7 +66,13 @@ def build_scb_monthly_changes(scb_lf: pl.LazyFrame) -> pl.LazyFrame:
         scb_lf_clean
         .with_columns(pl.col("value").cast(pl.Float64, strict=False))
         .group_by(change_keys)
-        .agg(pl.col("value").sum().alias("emp_count"))
+        # A month SCB suppresses ("..") is null, and a plain sum() would turn it
+        # into 0, showing a fake -100% fall; keep it null instead.
+        .agg(
+            pl.when(pl.col("value").count() > 0)
+            .then(pl.col("value").sum())
+            .alias("emp_count"),
+        )
         # Belt-and-suspenders against float-summation-order drift: group
         # reductions are parallelised, so a last-ULP difference between runs
         # is possible (confirmed empirically: ~1e-13 on a handful of rows).
@@ -94,6 +101,9 @@ def build_weighted_daioe(daioe_lf: pl.LazyFrame) -> pl.LazyFrame:
     """Filter DAIOE data for SSYK level 1 and calculate mean values for metrics."""
     return (
         daioe_lf
+        # NaN (an unscored occupation upstream) would make every mean NaN;
+        # treat it as missing.
+        .with_columns((cs.matches(r"^(pctl_)?daioe_") & cs.float()).fill_nan(None))
         .filter(pl.col("level") == "SSYK1")
         .select(
             pl.col(["level", "ssyk_code", "year", "weight_sum"]),
