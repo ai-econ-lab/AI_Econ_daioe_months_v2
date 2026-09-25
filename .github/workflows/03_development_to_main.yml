@@ -14,8 +14,6 @@ on:
         description: "Target branch to push deploy files into"
         required: false
         default: "main"
-  schedule:
-    - cron: "45 0 * * *"  # daily at 00:45 UTC (offset from workflows 01/02)
 
 concurrency:
   group: deploy-sync-${{ github.workflow }}-${{ github.ref }}
@@ -23,6 +21,7 @@ concurrency:
 
 permissions:
   contents: write
+  actions: write  # needed to trigger sync_to_hub.yml via `gh workflow run` below
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -64,6 +63,7 @@ jobs:
             "src/calcs.py"
             "src/visuals.py"
             "md_files/intro.md"
+            "md_files/about.md"
             "README.md"
           )
 
@@ -93,6 +93,7 @@ jobs:
             "src/calcs.py"
             "src/visuals.py"
             "md_files/intro.md"
+            "md_files/about.md"
             "README.md"
           )
 
@@ -105,12 +106,33 @@ jobs:
           ref: ${{ env.TARGET_BRANCH }}
           path: target
 
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: source/.python-version
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      # Gate: a failure here stops the job before anything is committed to
+      # main, so a bad dataset is never deployed to the Space.
+      - name: Validate the dataset before promoting it
+        run: |
+          set -euo pipefail
+          previous_args=()
+          if [ -f target/data/scb_months_lvl1.parquet ]; then
+            previous_args=(--previous target/data/scb_months_lvl1.parquet)
+          fi
+          uv run --no-project --with polars python source/scripts/validate.py \
+            source/data/scb_months_lvl1.parquet "${previous_args[@]}"
+
       - name: Apply deploy bundle
         run: |
           set -euo pipefail
           tar -xzf deploy-files.tgz -C target
 
       - name: Commit and push
+        id: promote
         working-directory: target
         run: |
           set -euo pipefail
@@ -131,16 +153,19 @@ jobs:
             src/calcs.py \
             src/visuals.py \
             md_files/intro.md \
+            md_files/about.md \
             README.md
 
           if git diff --cached --quiet; then
             echo "No changes to commit."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git commit -m "chore: promote deployable app files [skip ci]"
 
           for attempt in 1 2 3 4 5; do
             if git push origin "${TARGET_BRANCH}"; then
+              echo "changed=true" >> "$GITHUB_OUTPUT"
               exit 0
             fi
             echo "Push rejected (attempt ${attempt}/5); rebasing onto latest ${TARGET_BRANCH} and retrying..."
@@ -151,3 +176,12 @@ jobs:
 
           echo "ERROR: failed to push to ${TARGET_BRANCH} after 5 attempts."
           exit 1
+
+      # A push made with the workflow token does not trigger other workflows,
+      # and sync_to_hub.yml only runs weekly on its own, so start it here when
+      # main actually changed.
+      - name: Redeploy the Hugging Face Space
+        if: steps.promote.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run sync_to_hub.yml --repo "${GITHUB_REPOSITORY}" --ref main
