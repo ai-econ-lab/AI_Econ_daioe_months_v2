@@ -30,7 +30,7 @@ Data sources, key concept definitions, coverage details, and caveats.
 
 | Source | Description |
 | --- | --- |
-| [Labour Force Survey (AKU), SCB](https://www.statistikdatabasen.scb.se/pxweb/sv/ssd/START__AM__AM0401__AM0401I/NAKUSysselYrke2012M/) | Monthly employment counts and changes by occupation and sex |
+| [Labour Force Survey (AKU), SCB](https://www.statistikdatabasen.scb.se/pxweb/sv/ssd/START__AM__AM0401__AM0401I/NAKUSysselYrke2012M/) | Monthly counts of employed persons (SCB's "total employment" category) and changes, by occupation and sex |
 | [DAIOE Framework](https://www.ai-econlab.com/ai-exposure-daioe) | Data-driven AI Occupational Exposure scores across multiple AI capability sub-domains |
 
 **Coverage:** Sweden, SSYK 2012 major groups (1-digit, 9 categories), updated monthly.
@@ -76,6 +76,8 @@ css/
   ticker.css                    # Occupation ribbon / ticker styles
 data/
   scb_months_lvl1.parquet       # Runtime dataset (auto-updated by CI)
+scripts/
+  validate.py                   # Dataset checks run by CI before promotion
 md_files/
   intro.md                      # Sidebar intro text
   about.md                      # About tab content
@@ -89,13 +91,15 @@ graph LR
     scb_pull --> daioe_pull --> development --> main --> HF[Hugging Face Spaces]
 ```
 
-Each stage runs on push, daily cron at 00:00 UTC, or manual `workflow_dispatch`.
+`scb_pull` runs daily at 00:00 UTC and triggers each following stage when it finishes;
+every stage also runs on a push to its branch or a manual `workflow_dispatch`. The Hugging Face
+sync also runs weekly, on Sundays.
 
 | Stage | Workflow | What it does |
 | --- | --- | --- |
 | `scb_pull` | `01_scb_pull_to_daioe_pull.yml` | Fetches SCB employment data, produces `scb_months.parquet`, commits to `daioe_pull` |
 | `daioe_pull` | `02_daioe_pull_to_development.yml` | Merges DAIOE AI-exposure scores, produces `scb_months_lvl1.parquet`, commits to `development` |
-| `development` | `03_development_to_main.yml` | Validates and promotes all deploy files to `main` |
+| `development` | `03_development_to_main.yml` | Checks the dataset with `scripts/validate.py`, promotes all deploy files to `main`, and starts the Hugging Face sync if `main` changed |
 | `main` | `sync_to_hub.yml` | Syncs `main` to the Hugging Face Space, triggering a Docker rebuild |
 
 ## About the Project

@@ -98,7 +98,9 @@ def _process_exposure_df(df: pl.DataFrame) -> pl.DataFrame:
 
     Returns an empty DataFrame if df has no rows, so callers' is_empty() checks
     (e.g. build_ai_exposure_bar) correctly detect missing data instead of
-    receiving placeholder rows with null scores.
+    receiving placeholder rows with null scores. Sub-domains with no score for
+    the year (DAIOE has none for imgcompr in 2014-2015, for example) are left
+    out for the same reason; a null percentile cannot be plotted or coloured.
     """
     if df.is_empty():
         return pl.DataFrame()
@@ -122,7 +124,7 @@ def _process_exposure_df(df: pl.DataFrame) -> pl.DataFrame:
                 "percentile": df[pctl_col].mean(),
             },
         )
-    return pl.DataFrame(rows).sort("score")
+    return pl.DataFrame(rows).drop_nulls(["score", "percentile"]).sort("score")
 
 
 def get_occ_summary(
