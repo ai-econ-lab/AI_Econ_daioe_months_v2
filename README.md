@@ -35,6 +35,14 @@ Data sources, key concept definitions, coverage details, and caveats.
 
 **Coverage:** Sweden, SSYK 2012 major groups (1-digit, 9 categories), updated monthly.
 
+## Dataset Releases
+
+The dataset the app reads, `scb_months_lvl1.parquet`, is also published as a GitHub release asset. `dataset-latest` holds the current file and is overwritten on every run. Each time the content changes, a dated release, `dataset-YYYY-MM-DD`, is also created; later runs leave it as it is (unless the data changes again on the same day), so cite one of those for a fixed version. GitHub shows each file's SHA-256 next to the asset. List them with:
+
+```bash
+gh release list --repo ai-econ-lab/AI_Econ_daioe_months_v2
+```
+
 ## Tech Stack
 
 - **[Shiny for Python](https://shiny.posit.co/py/)** (Express syntax) for the interactive UI
@@ -99,7 +107,7 @@ sync also runs weekly, on Sundays.
 | --- | --- | --- |
 | `scb_pull` | `01_scb_pull_to_daioe_pull.yml` | Fetches SCB employment data, produces `scb_months.parquet`, commits to `daioe_pull` |
 | `daioe_pull` | `02_daioe_pull_to_development.yml` | Merges DAIOE AI-exposure scores, produces `scb_months_lvl1.parquet`, commits to `development` |
-| `development` | `03_development_to_main.yml` | Checks the dataset with `scripts/validate.py`, promotes all deploy files to `main`, and starts the Hugging Face sync if `main` changed |
+| `development` | `03_development_to_main.yml` | Checks the dataset with `scripts/validate.py`, promotes all deploy files to `main`, starts the Hugging Face sync if `main` changed, and publishes the dataset releases |
 | `main` | `sync_to_hub.yml` | Syncs `main` to the Hugging Face Space, triggering a Docker rebuild |
 
 ## About the Project
