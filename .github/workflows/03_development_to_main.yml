@@ -185,3 +185,63 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run sync_to_hub.yml --repo "${GITHUB_REPOSITORY}" --ref main
+
+      # dataset-latest is the current published dataset and is overwritten on
+      # every run; the previous copy is downloaded first so the snapshot step
+      # can tell whether the content changed.
+      - name: Download the previous dataset release for comparison
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p previous
+          gh release download dataset-latest --repo "${GITHUB_REPOSITORY}" \
+            -p 'scb_months_lvl1.parquet' -D previous --clobber || \
+            echo "No previous dataset release yet; a dated snapshot will be created."
+
+      - name: Publish the dataset-latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release view dataset-latest --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1 || \
+            gh release create dataset-latest --repo "${GITHUB_REPOSITORY}" \
+              --target main \
+              --title "AI-SCB Months - dataset (latest)" \
+              --notes "Latest published dataset."
+          gh release upload dataset-latest source/data/scb_months_lvl1.parquet \
+            --repo "${GITHUB_REPOSITORY}" --clobber
+
+      # dataset-latest cannot be cited as a fixed version. When the published
+      # bytes change (or no dated release exists yet), also keep them under
+      # dataset-YYYY-MM-DD. The tag points at main's newest commit, which by now
+      # carries this same file. A second change on the same day updates that
+      # day's release.
+      - name: Snapshot a dated release when the dataset changes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          new_file=source/data/scb_months_lvl1.parquet
+          old_file=previous/scb_months_lvl1.parquet
+          new_sha=$(sha256sum "${new_file}" | cut -d' ' -f1)
+          old_sha=""
+          if [ -f "${old_file}" ]; then
+            old_sha=$(sha256sum "${old_file}" | cut -d' ' -f1)
+          fi
+          dated_count=$(gh release list --repo "${GITHUB_REPOSITORY}" --limit 200 \
+            --json tagName -q '[.[] | select(.tagName | startswith("dataset-2"))] | length')
+          if [ "${new_sha}" = "${old_sha}" ] && [ "${dated_count}" != "0" ]; then
+            echo "Dataset unchanged and a dated release already exists; no snapshot."
+            exit 0
+          fi
+
+          day=$(date -u +%F)
+          tag="dataset-${day}"
+          gh release view "${tag}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1 || \
+            gh release create "${tag}" --repo "${GITHUB_REPOSITORY}" \
+              --target main \
+              --title "AI-SCB Months - dataset ${day}" \
+              --notes "Snapshot of the published dataset, ${day}."
+          gh release upload "${tag}" "${new_file}" \
+            --repo "${GITHUB_REPOSITORY}" --clobber
