@@ -220,6 +220,7 @@ jobs:
       # parquet bytes. The 1e-12 tolerance ignores that noise and nothing else.
       # The tag points at main's newest commit, which by now carries this same
       # file. A second change on the same day updates that day's release.
+      # --latest=false keeps GitHub's "Latest" badge on dataset-latest.
       - name: Snapshot a dated release when the dataset changes
         env:
           GH_TOKEN: ${{ github.token }}
@@ -255,7 +256,7 @@ jobs:
           tag="dataset-${day}"
           gh release view "${tag}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1 || \
             gh release create "${tag}" --repo "${GITHUB_REPOSITORY}" \
-              --target main \
+              --target main --latest=false \
               --title "AI-SCB Months - dataset ${day}" \
               --notes "Snapshot of the published dataset, ${day}."
           gh release upload "${tag}" "${new_file}" \
